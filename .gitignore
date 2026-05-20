@@ -1,0 +1,44 @@
+# Reference source (not committed)
+_base44-reference/
+
+# Environment files
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.local
+frontend/.env.*
+
+# Dependencies
+node_modules/
+vendor/
+
+# Laravel storage
+backend/storage/logs/
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/bootstrap/cache/
+
+# Next.js
+.next/
+frontend/out/
+frontend/dist/
+frontend/build/
+
+# Build artifacts
+dist/
+build/
+
+# Database dumps
+*.sql
+*.sql.gz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
