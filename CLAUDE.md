@@ -3,7 +3,7 @@
 **Type:** Migration from base44 (self-service ad-campaign onboarding platform)
 **Operator:** Ummah Media Group LLC
 **Developer:** Ashraf Ansari
-**Status:** S2 complete (2026-05-20) — S3 (wizard shell + Step 1) is next
+**Status:** S3 complete (2026-05-20) — S4 (wizard Step 2 + Step 3 review) is next
 
 ---
 
@@ -233,7 +233,7 @@ couldn't enforce them:
 |---------|--------|
 | **S1**  | ✅ 2026-05-20 — Server scaffold — directories, Laravel 11.53.1 + Next.js 16.2.6 install, DB, `.env`, Nginx staged (not enabled), PM2 entries (IDs 54/55/56), CLAUDE.md updated |
 | **S2**  | ✅ 2026-05-20 — Data layer: 8 enums, 4 migrations (advertisers, audit_logs, users.role, personal_access_tokens), 3 models, 3 FormRequests, 3 controllers (Advertiser/Upload/Health), 4 rate-limited routes, storage:link, 6+ curl smoke tests passed |
-| **S3**  | Wizard shell + Step 1 (BusinessInfo) with auto-save |
+| **S3**  | ✅ 2026-05-20 — Wizard shell + Step 1 (BusinessInfo) with 1s-debounce auto-save against PATCH /api/v1/advertisers/{id}; shadcn/ui (base-ui flavoured for Tailwind v4) initialised; URL + localStorage resume; CORS for staging IP + production domain |
 | **S4**  | Wizard Step 2 (CampaignSetup, LocationPicker, BudgetRecommendation) + Step 3 shell (ReviewStep without payment) |
 | **S5**  | AdCreativeStep — upload flow with server-side dimension validation |
 | **S6**  | Stripe checkout + webhook + PaymentSuccess/Cancelled/ApplicationSuccess pages |
@@ -582,3 +582,160 @@ references it.
 - **Per-record file ownership.** PHP runs as root under PM2, so uploaded
   files are root-owned. Cleanup commands must run as root (artisan via PM2,
   or root cron) — claude-dev can't `rm` them directly.
+
+---
+
+## S3 COMPLETION NOTES (2026-05-20)
+
+### Backend CORS
+
+`backend/config/cors.php` created (Laravel 11 ships without it by default).
+Reads comma-separated origins from `CORS_ALLOWED_ORIGINS`:
+- `http://37.27.215.90:3004` (staging direct-IP access pre-cutover)
+- `https://advertise.muslimadnetwork.com` (production, post-S12)
+
+Both origins are allowed simultaneously so the DNS cutover does not require a
+backend redeploy. Verified via `curl -X OPTIONS … -H "Origin: …"` — both
+allowed origins receive `Access-Control-Allow-Origin` matching their request
+origin; unknown origins receive no allow header.
+
+### Frontend stack
+
+- shadcn/ui (`shadcn` package v4) initialised — defaults: New York style,
+  slate base, CSS variables. Tailwind v4 + `@base-ui/react` (the v4 successor
+  to per-component Radix packages). 9 components added: `button`, `card`,
+  `input`, `label`, `select`, `textarea`, `alert`, `badge`, `sonner`.
+- `next-themes` is installed as a transitive dependency via the sonner
+  component but is **not** wired into the app. `useTheme()` returns
+  `{theme: undefined}` outside a provider; the destructuring default in
+  `Toaster` falls back to `"system"`. No ThemeProvider needed for v1.
+- Inter font replaces the default Geist (registered as `--font-sans`).
+
+### Files added/changed
+
+```
+frontend/
+├── components.json                                     (shadcn config)
+├── next.config.mjs                                     (security headers)
+├── src/
+│   ├── app/
+│   │   ├── globals.css                                 (shadcn tokens + tw-animate-css)
+│   │   ├── layout.js                                   (title/meta, Toaster, Inter font)
+│   │   └── page.js                                     (wizard shell — client)
+│   ├── components/
+│   │   ├── signup/
+│   │   │   ├── BusinessInfoStep.jsx                    (Step 1, full port)
+│   │   │   ├── CampaignSetupStep.jsx                   (Step 2 placeholder)
+│   │   │   ├── ReviewStep.jsx                          (Step 3 placeholder)
+│   │   │   └── StepProgress.jsx                        (stateless progress bar)
+│   │   └── ui/                                         (9 shadcn components)
+│   └── lib/
+│       ├── api.js                                      (ApiError, getApiUrl, CRUD helpers)
+│       ├── draft-storage.js                            (localStorage handle)
+│       └── utils.js                                    (shadcn cn() helper)
+backend/
+├── config/cors.php                                     (new)
+└── .env                                                (CORS_ALLOWED_ORIGINS expanded)
+```
+
+### Wizard contract
+
+- **localStorage keys:**
+  - `advertise_draft_id` — UUID of the in-progress draft
+  - `advertise_draft_token` — 64-char access_token returned from create
+
+- **URL resume params:**
+  `?return={uuid}&token={access_token}` — used by the recovery email links
+  the admin will send (S8). The wizard parses both, hits `getAdvertiser`, and
+  if `payment_status !== 'paid'` writes the handle to localStorage and
+  restores formData + currentStep based on the saved `status`.
+
+- **Step → status mapping (auto-save):**
+  - Step 0 → `incomplete_step_1`
+  - Step 1 → `incomplete_step_2`
+  - Step 2 → `pending_review`
+
+- **Status → step mapping (resume):**
+  - `incomplete_step_1` → 0
+  - `incomplete_step_2` / `incomplete_step_3` → 1
+  - `pending_review` / `approved` / `rejected` / `active` / `paused` → 2
+
+- **Auto-save:**
+  - 1-second debounce after the last `updateFormData()` call
+  - Requires `contact_email` (otherwise the row would be unfindable later)
+  - No advertiserId yet → `createAdvertiser` → store `{id, token}` in
+    localStorage → set state
+  - advertiserId exists → `updateAdvertiser(id, token, payload)`
+  - On error: silent retry on next change (no toast spam — by design)
+  - `saveStatus` lifecycle: `idle` → `saving` → `saved` (2s) → `idle`
+
+- **Resume failure handling:** if `getAdvertiser` returns 403 or 404 (stale
+  handle from a row that was deleted server-side, or token mismatch), the
+  wizard calls `clearDraft()` and starts fresh.
+
+### Security headers (frontend)
+
+`next.config.mjs` `headers()` adds to every response:
+- `X-Frame-Options: SAMEORIGIN`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+
+CSP is deliberately **not** added here — Stripe / PayPal iframe sources are
+unknown until S6/S7, and the EPOM ad scripts (if marketing pages need them in
+S12) require explicit `script-src` allowlisting. Adding CSP now would just
+mean ripping it back out at every payment integration step. S12 final-polish
+adds a complete CSP.
+
+### Build + smoke results
+
+- `npm run build` → **clean** (no errors, no warnings), 4 static pages
+- `curl http://localhost:3004` → 200, SSR renders title, headline, badge,
+  loading spinner
+- `curl -I http://localhost:3004` → all 3 security headers present
+- `NEXT_PUBLIC_API_URL=http://37.27.215.90:8004` correctly bundled into the
+  page chunk (confirmed by grep on served JS chunk)
+- End-to-end: `POST /api/v1/advertisers` with `Origin: http://37.27.215.90:3004`
+  → 201 + `Access-Control-Allow-Origin` returned + `access_token` in body.
+  Follow-up `PATCH` with that token → 200.
+
+### Deviations from the original spec
+
+1. **shadcn/ui internals.** The original spec assumed shadcn would install
+   `@radix-ui/react-*` packages. shadcn v4 + Tailwind v4 uses `@base-ui/react`
+   (Material UI's successor primitives library) instead. API surface for
+   Select is identical (`value` / `onValueChange` / SelectContent / SelectItem)
+   so the BusinessInfoStep port required no API changes. Documented this for
+   future component additions — don't paste in Radix-specific code from
+   external snippets without checking the local component first.
+2. **Sonner without ThemeProvider.** The shadcn-generated `Toaster` imports
+   `useTheme` from `next-themes`, but `next-themes` returns a safe default
+   when there is no provider. We don't ship a ThemeProvider in v1 — light
+   mode is the only theme.
+3. **`Card ref={formRef}`.** React 19 + Next.js 16 + the new shadcn `Card`
+   already accepts `ref` directly (no `forwardRef` needed). Verified at build
+   time — no warning.
+4. **`createPageUrl`, `useNavigate`.** Both base44/react-router-only — not
+   ported. The wizard is a single page; no client routing needed for v1.
+5. **Strict-mode double-mount.** React 19 strict mode in dev still
+   double-invokes effects, but the resume effect has no side effects beyond
+   the fetch — `getAdvertiser` is idempotent and `saveDraft` is set-not-
+   append. No special handling required.
+6. **Removed during port (will return later):** `BrandLogos`,
+   `PublisherShowcase`, `CaseStudyPreview`, `RamadanCountdownBanner`,
+   `TranslationProvider`, `useTranslatedContent`, `LanguageSelector`, the
+   trust-signals row, and the "Powered by" footer. All scheduled for S4 (UX
+   sidebar) and S12 (marketing pages + final polish).
+
+### Known follow-ups for S4+
+
+- **Step 2 wiring.** The placeholder receives `formData` / `updateFormData`
+  with the same shape Step 1 produces — drop-in replacement when
+  CampaignSetupStep, LocationPicker, BudgetRecommendation are ported.
+- **Submission gate.** The backend already enforces required-at-submission
+  validation when `status: pending_review` is sent. The frontend currently
+  only validates Step 1; Step 2 + Step 3 validation lands in S4.
+- **Recovery email URLs.** Format: `${FRONTEND_URL}/?return={id}&token={token}` —
+  matches the resume parser. Will be used by the SendRecoveryEmail job in S8.
+- **Toaster wired but not used.** No toasts fired yet — kept silent on
+  save failures by design. S6 (payment) will be the first user of `toast.*`
+  for checkout errors.
