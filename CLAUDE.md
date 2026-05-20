@@ -3,7 +3,7 @@
 **Type:** Migration from base44 (self-service ad-campaign onboarding platform)
 **Operator:** Ummah Media Group LLC
 **Developer:** Ashraf Ansari
-**Status:** S1 complete (2026-05-20) — S2 (data layer) is next
+**Status:** S2 complete (2026-05-20) — S3 (wizard shell + Step 1) is next
 
 ---
 
@@ -232,7 +232,7 @@ couldn't enforce them:
 | Session | Output |
 |---------|--------|
 | **S1**  | ✅ 2026-05-20 — Server scaffold — directories, Laravel 11.53.1 + Next.js 16.2.6 install, DB, `.env`, Nginx staged (not enabled), PM2 entries (IDs 54/55/56), CLAUDE.md updated |
-| **S2**  | Data layer — migrations, models, AdvertiserController CRUD, FormRequest validation, upload endpoint, audit log table |
+| **S2**  | ✅ 2026-05-20 — Data layer: 8 enums, 4 migrations (advertisers, audit_logs, users.role, personal_access_tokens), 3 models, 3 FormRequests, 3 controllers (Advertiser/Upload/Health), 4 rate-limited routes, storage:link, 6+ curl smoke tests passed |
 | **S3**  | Wizard shell + Step 1 (BusinessInfo) with auto-save |
 | **S4**  | Wizard Step 2 (CampaignSetup, LocationPicker, BudgetRecommendation) + Step 3 shell (ReviewStep without payment) |
 | **S5**  | AdCreativeStep — upload flow with server-side dimension validation |
@@ -324,6 +324,13 @@ From base44 `package.json` — keep these:
 8. **SQL dumps must be gitignored.** Never commit them.
 9. **Reference base44 source** at `/var/www/advertise-muslimadnetwork/_base44-reference/`
    for UI/UX patterns and business logic. Never copy base44 SDK calls.
+10. **Inner `.git` cleanup.** After running any tool that calls `git init` inside
+    a subdirectory (e.g. `create-next-app`, `composer create-project`), delete
+    the inner `.git/` before the parent repo's next commit — otherwise the
+    parent treats it as a submodule and history breaks. Always run
+    `find /var/www/advertise-muslimadnetwork -name .git -not -path '*/_base44-reference/*'`
+    after any scaffolding command and remove any nested `.git` directories
+    found below the project root.
 
 ---
 
@@ -453,3 +460,125 @@ sudo nginx -t
 - `SHOW TABLES` in `advertise_muslimadnetwork` → 9 default tables present
 - `sudo nginx -t` → syntax ok
 - All 3 PM2 processes: **online**
+
+---
+
+## S2 COMPLETION NOTES (2026-05-20)
+
+### Schema delivered
+- `advertisers` — UUID PK, soft deletes, 36 columns (full base44 schema +
+  `access_token`), indexes on status / payment_status / contact_email /
+  created_at, unique index on access_token
+- `audit_logs` — UUID PK, append-only (no `updated_at`), nullable
+  `user_id` FK, indexes on action / target_type / target_id
+- `users.role` — string column added, default `user`, indexed
+- `personal_access_tokens` — created by `php artisan install:api` (Sanctum,
+  for admin auth in S9)
+
+### Enums (app/Enums/)
+`BusinessType`, `CampaignObjective`, `PurchaseType`, `PaymentMethod`,
+`PaymentStatus`, `TargetGender`, `AdvertiserStatus`, `UserRole` — all string-
+backed, all expose `static values(): array` for use in validation rules and
+admin filters.
+
+### Models
+- `App\Models\Advertiser` — `HasUuids`, `SoftDeletes`, full enum + JSON casts,
+  `access_token` hidden by default (exposed once via `withAccessToken()` on
+  create), `creating` boot hook auto-generates a 64-char access_token,
+  `calculateTotal()` is the **canonical server-side price calculation**
+  (monthly_budget + (design_service ? 200 : 0)) — Stripe/PayPal in S6/S7
+  MUST call this, never trust client-supplied amounts.
+- `App\Models\AuditLog` — `$timestamps = false`, only `created_at` (managed
+  by MySQL `CURRENT_TIMESTAMP` default), `belongsTo(User::class)`.
+- `App\Models\User` — added `HasApiTokens` (Sanctum), `role` cast to
+  `UserRole` enum, `isAdmin(): bool` helper.
+
+### Public API endpoints (no auth, rate-limited per IP)
+
+| Method | Path | Throttle | Purpose |
+|--------|------|----------|---------|
+| GET | `/api/health` | none | Health probe — returns `{status,timestamp,version}` |
+| POST | `/api/v1/advertisers` | 10/h | Create draft. **Only response that exposes `access_token`** |
+| GET | `/api/v1/advertisers/{id}?token=...` | 60/h | Load draft (token-gated, never returns access_token) |
+| PATCH | `/api/v1/advertisers/{id}?token=...` | 120/h | Update draft (token-gated, locked once paid) |
+| POST | `/api/v1/uploads` | 30/h | Upload creative (multipart: advertiser_id + access_token + file) |
+
+Rate limiters are registered in `app/Providers/AppServiceProvider::boot()`.
+
+### Access-token security model — **REMEMBER THIS**
+
+The flow is **token-on-create, token-from-client thereafter**:
+
+1. `POST /api/v1/advertisers` creates the row and returns the full record
+   INCLUDING `access_token`. This is the **only** response that ever exposes
+   the token.
+2. Frontend stores `access_token` in localStorage (per record).
+3. Every subsequent `GET` and `PATCH` on `/api/v1/advertisers/{id}` requires
+   `?token=...` matching the row's `access_token`. Mismatch → 403. Missing → 403.
+   Unknown id → 404.
+4. The Upload endpoint requires both `advertiser_id` and `access_token` in
+   the multipart body — same token model.
+5. Once `payment_status === 'paid'`, the record is locked from further public
+   updates — PATCH returns **409 Conflict**. Admin endpoints (S9) will bypass
+   this lock.
+
+`hash_equals()` is used throughout — never raw `===` comparisons on tokens.
+
+### Upload controller — security model
+
+- **Genuine MIME via `getimagesize()`** — never trusts the upload's reported
+  MIME header (browser-supplied, attacker-controllable).
+- **Allowed dimensions only:** 300×250, 728×90, 160×600, 320×50. Anything else
+  → 422 with a clear error listing the four allowed sizes.
+- **EXIF stripped** — image is re-encoded through GD, GPS/camera metadata
+  dropped. PNG transparency preserved.
+- **Filename rewritten** to `{uuid}.{ext}` — never trusts the uploaded
+  filename. Stored at `storage/app/public/ad-creatives/{advertiser_id}/{uuid}.{ext}`.
+- **Max 4 creatives per advertiser** enforced by counting `ad_creatives` array
+  on the Advertiser before accepting the upload.
+- Response shape matches the base44 frontend contract:
+  `{ file_url, file_name, file_size, width, height, dimension_label }`.
+
+### Submission gate
+
+`UpdateAdvertiserRequest::withValidator()` only enforces "required at
+submission" fields when the request sets `status: pending_review`. Required
+at submission: `business_name`, `business_type`, `contact_name`,
+`contact_email`, `contact_phone`, `campaign_name`, `campaign_objective`,
+`monthly_budget`, `campaign_start_date`, `campaign_end_date`,
+`ad_destination_url`, AND at least one of `target_countries` or
+`target_location`. Until that transition, every field is nullable so partial
+auto-save works.
+
+### Smoke tests run (2026-05-20)
+1. `GET /api/health` → 200 `{status: ok, version: 0.1.0}` ✅
+2. `POST /api/v1/advertisers` → 201, access_token in response, created_by
+   auto-set to contact_email ✅
+3. `PATCH /api/v1/advertisers/{id}?token={token}` → 200, fields updated ✅
+4. `PATCH /api/v1/advertisers/{id}?token=wrong` → 403 ✅
+5. `GET /api/v1/advertisers/{id}?token={token}` → 200, **no access_token in
+   response** ✅
+6. `PATCH` with `business_type=not_a_real_type` → 422 ✅
+7. (bonus) `GET` without token → 403 ✅
+8. (bonus) `GET` with unknown id → 404 ✅
+9. (bonus) `PATCH` after payment_status manually set to paid → 409 ✅
+10. (bonus) `POST /api/v1/uploads` with 300×250 PNG → 201, file stored and
+    served from `/storage/ad-creatives/{id}/{uuid}.png` ✅
+11. (bonus) Upload with 640×480 → 422 with clear allowed-dimensions message ✅
+12. (bonus) Upload with wrong access_token → 422 (validation rejection) ✅
+
+Test record + uploaded file cleaned from database. Orphaned file on disk
+(owned by root because PM2 runs PHP as root) is harmless — no DB row
+references it.
+
+### Known follow-ups for later sessions
+- **Audit log writes** are wired up at table+model level only. Admin
+  controllers in S9/S10 will start writing rows.
+- **`personal_access_tokens` table** is provisioned but no User can yet
+  authenticate against it — S9 wires up UmmahPass SSO + admin login.
+- **Orphaned creative cleanup** — when a draft is deleted (soft or hard), the
+  uploaded files in `storage/app/public/ad-creatives/{id}/` are not yet
+  cleaned. Schedule for the PII-cleanup job in S8.
+- **Per-record file ownership.** PHP runs as root under PM2, so uploaded
+  files are root-owned. Cleanup commands must run as root (artisan via PM2,
+  or root cron) — claude-dev can't `rm` them directly.

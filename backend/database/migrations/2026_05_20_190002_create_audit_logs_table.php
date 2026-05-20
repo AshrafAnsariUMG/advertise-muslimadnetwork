@@ -1,0 +1,37 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('audit_logs', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+
+            // Nullable — system actions have no user
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+
+            $table->string('action');
+            $table->string('target_type');
+            $table->string('target_id');
+            $table->json('changes')->nullable();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+
+            // Append-only: created_at only, no updated_at
+            $table->timestamp('created_at')->useCurrent();
+
+            $table->index('action');
+            $table->index('target_type');
+            $table->index('target_id');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('audit_logs');
+    }
+};
