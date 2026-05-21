@@ -19,10 +19,12 @@ import { saveDraft, loadDraft, clearDraft } from '@/lib/draft-storage';
 
 const STEPS = ['Your Business', 'Choose Your Budget', 'Review & Launch'];
 
+// Landing on the review screen does NOT auto-submit. The transition to
+// 'pending_review' happens only when the user initiates payment (S6/S7).
 const STATUS_BY_STEP = {
   0: 'incomplete_step_1',
   1: 'incomplete_step_2',
-  2: 'pending_review',
+  2: 'incomplete_step_3',
 };
 
 const STEP_BY_STATUS = {
@@ -213,8 +215,61 @@ export default function AdvertiserSignupPage() {
         setError('Please fill in all required fields');
         return false;
       }
+      return true;
     }
-    // Steps 1 / 2 validation lands in S4 / S6
+
+    if (currentStep === 1) {
+      const required = [
+        ['campaign_name', 'Campaign name'],
+        ['campaign_objective', 'Campaign objective'],
+        ['monthly_budget', 'Monthly budget'],
+        ['campaign_start_date', 'Campaign start date'],
+        ['campaign_end_date', 'Campaign end date'],
+      ];
+
+      for (const [field, label] of required) {
+        if (!formData[field]) {
+          setError(`${label} is required`);
+          return false;
+        }
+      }
+
+      const hasCountries =
+        Array.isArray(formData.target_countries) &&
+        formData.target_countries.length > 0;
+      const hasLocation =
+        formData.target_location &&
+        formData.target_location.latitude != null &&
+        formData.target_location.longitude != null;
+
+      if (!hasCountries && !hasLocation) {
+        setError('Please choose at least one target country or location');
+        return false;
+      }
+
+      if (
+        formData.campaign_objective === 'drive_foot_traffic' &&
+        !formData.campaign_offer
+      ) {
+        setError('Please enter the special offer you are promoting');
+        return false;
+      }
+
+      const start = new Date(formData.campaign_start_date);
+      const end = new Date(formData.campaign_end_date);
+      if (
+        !Number.isNaN(start.getTime()) &&
+        !Number.isNaN(end.getTime()) &&
+        end <= start
+      ) {
+        setError('Campaign end date must be after the start date');
+        return false;
+      }
+
+      return true;
+    }
+
+    // Step 2 (review) — no inline validation; payment will land in S6/S7
     return true;
   };
 
@@ -275,7 +330,17 @@ export default function AdvertiserSignupPage() {
         );
       case 2:
         return (
-          <ReviewStep formData={formData} updateFormData={updateFormData} />
+          <ReviewStep
+            formData={formData}
+            updateFormData={updateFormData}
+            advertiserId={advertiserId}
+            accessToken={accessToken}
+            onEditSection={(stepIndex) => {
+              setError(null);
+              setCurrentStep(stepIndex);
+            }}
+            onBack={handleBack}
+          />
         );
       default:
         return null;

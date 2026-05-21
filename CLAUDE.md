@@ -3,7 +3,7 @@
 **Type:** Migration from base44 (self-service ad-campaign onboarding platform)
 **Operator:** Ummah Media Group LLC
 **Developer:** Ashraf Ansari
-**Status:** S3 complete (2026-05-20) — S4 (wizard Step 2 + Step 3 review) is next
+**Status:** S4 complete (2026-05-21) — S5 (ad creative upload UI) is next
 
 ---
 
@@ -234,7 +234,7 @@ couldn't enforce them:
 | **S1**  | ✅ 2026-05-20 — Server scaffold — directories, Laravel 11.53.1 + Next.js 16.2.6 install, DB, `.env`, Nginx staged (not enabled), PM2 entries (IDs 54/55/56), CLAUDE.md updated |
 | **S2**  | ✅ 2026-05-20 — Data layer: 8 enums, 4 migrations (advertisers, audit_logs, users.role, personal_access_tokens), 3 models, 3 FormRequests, 3 controllers (Advertiser/Upload/Health), 4 rate-limited routes, storage:link, 6+ curl smoke tests passed |
 | **S3**  | ✅ 2026-05-20 — Wizard shell + Step 1 (BusinessInfo) with 1s-debounce auto-save against PATCH /api/v1/advertisers/{id}; shadcn/ui (base-ui flavoured for Tailwind v4) initialised; URL + localStorage resume; CORS for staging IP + production domain |
-| **S4**  | Wizard Step 2 (CampaignSetup, LocationPicker, BudgetRecommendation) + Step 3 shell (ReviewStep without payment) |
+| **S4**  | ✅ 2026-05-21 — Wizard Step 2 fully ported (CampaignSetupStep with CTV add-on, performance estimate, budget presets), LocationPicker (react-leaflet via dynamic ssr:false), BudgetRecommendation, Review shell with disabled payment buttons + Edit-back nav. State machine fixed: Step 2 → `incomplete_step_3`, not `pending_review` |
 | **S5**  | AdCreativeStep — upload flow with server-side dimension validation |
 | **S6**  | Stripe checkout + webhook + PaymentSuccess/Cancelled/ApplicationSuccess pages |
 | **S7**  | PayPal checkout + webhook |
@@ -739,3 +739,124 @@ adds a complete CSP.
 - **Toaster wired but not used.** No toasts fired yet — kept silent on
   save failures by design. S6 (payment) will be the first user of `toast.*`
   for checkout errors.
+
+---
+
+## S4 COMPLETION NOTES (2026-05-21)
+
+### State machine — corrected
+
+`STATUS_BY_STEP` in `frontend/src/app/page.js`:
+
+| Step | Status                | Notes |
+|------|-----------------------|-------|
+| 0    | `incomplete_step_1`   | Step 1 entered |
+| 1    | `incomplete_step_2`   | Step 2 entered |
+| 2    | `incomplete_step_3`   | Step 3 (review) entered — **NOT** `pending_review` |
+
+`pending_review` is now reserved for the explicit payment-initiation
+transition that lands in S6/S7. Landing on the review screen no longer
+auto-submits the record.
+
+The `STEP_BY_STATUS` resume map already handles all the late-stage statuses
+(`pending_review`, `approved`, `rejected`, `active`, `paused`) by jumping to
+step 2.
+
+### Dependencies added
+
+```
+leaflet              1.9.4
+react-leaflet        5.0.0
+```
+
+`@types/leaflet` skipped — this is a JS project (no tsconfig enforcement)
+and base44's runtime is JS-only.
+
+### shadcn components added in S4
+
+`slider`, `checkbox`, `tooltip`, `separator`. (S3 already added button, card,
+input, label, select, textarea, alert, badge, sonner.)
+
+### New components
+
+| File                                                              | Notes |
+|-------------------------------------------------------------------|-------|
+| `src/components/signup/CampaignSetupStep.jsx`                     | Full Step 2 — CTV add-on, $5 CPM math, budget presets, performance estimate, country chips, age/gender selects, conditional LocationPicker when business_type=`restaurant` |
+| `src/components/signup/LocationPicker.jsx`                        | react-leaflet — `MapContainer`, draggable marker, click-to-move, radius slider 1–50 mi, OSM tiles (no API key needed), "Use Current Location" via `navigator.geolocation` |
+| `src/components/signup/BudgetRecommendation.jsx`                  | Industry-based nudge banner. Inline near budget slider in CampaignSetupStep. Renders nothing if current budget ≥ industry recommended |
+| `src/components/signup/ReviewStep.jsx`                            | Read-only summaries for steps 0+1, ad-creative placeholder, payment summary with `monthly_budget + (design_service ? 200 : 0)`, two disabled payment buttons (Stripe / PayPal) wrapped in base-ui `Tooltip` showing "Coming in next build session" |
+
+### LocationPicker — SSR pattern
+
+`react-leaflet` reads `window`/`document` at module-evaluation time, so it
+cannot be imported eagerly. The picker is consumed from CampaignSetupStep
+via:
+
+```jsx
+const LocationPicker = dynamic(() => import('./LocationPicker'), {
+  ssr: false,
+  loading: () => <div>Loading map…</div>,
+});
+```
+
+LocationPicker.jsx is `'use client'` and wraps the Leaflet marker icon URL
+fix in a `typeof window !== 'undefined'` guard so the module itself is
+import-safe (the dynamic loader skips it on the server but this belt-and-
+braces also protects future direct imports).
+
+OpenStreetMap is the tile provider (no API key, attribution shown).
+
+### Wizard wiring (page.js)
+
+- `validateStep()` now enforces full Step 2 validation:
+  - Required: `campaign_name`, `campaign_objective`, `monthly_budget`,
+    `campaign_start_date`, `campaign_end_date`
+  - At least one of `target_countries[]` or `target_location`
+  - If `campaign_objective === 'drive_foot_traffic'` then
+    `campaign_offer` is required
+  - `campaign_end_date > campaign_start_date`
+- `ReviewStep` props: `formData`, `updateFormData`, `advertiserId`,
+  `accessToken`, `onEditSection(stepIndex)`, `onBack`. The Edit chips in the
+  review jump back to the relevant step via `setCurrentStep(stepIndex)`.
+
+### Known issues / follow-ups
+
+- **`include_ctv` is client-only.** The CampaignSetupStep CTV checkbox
+  toggles `formData.include_ctv` for the live UI math, but the backend
+  `StoreAdvertiserRequest` / `UpdateAdvertiserRequest` don't whitelist
+  `include_ctv`. Laravel's `validated()` filter strips it on save, so the
+  field does NOT round-trip through resume. **If we want CTV to persist
+  across refreshes,** the backend needs a `boolean include_ctv` column and
+  matching validation rule. Decision deferred to whoever owns CTV product
+  scope — flag for product before S6.
+- **Disabled payment buttons.** The base-ui `Tooltip` wraps a non-button
+  span (`render={<span/>}`) so hover events bubble even though the inner
+  `<button disabled>` blocks pointer-events. Replace this stub with the real
+  Stripe/PayPal flow in S6/S7.
+- **No date-fns dep.** Used `Intl.DateTimeFormat` for the two date-format
+  calls in ReviewStep. Saved a dependency.
+- **Default values applied once.** CampaignSetupStep's defaulting effect
+  intentionally runs only on mount (`[]` deps) — repeatedly applying defaults
+  on every render would clobber the user's choices.
+
+### Build + smoke
+
+- `npm run build` — clean, zero warnings, 4 static pages
+- `curl http://localhost:3004` — HTTP 200, SSR shows title, headline, loading
+  spinner
+- Leaflet CSS bundled into the served CSS chunk (`leaflet-container` rule
+  present)
+- End-to-end: `POST /api/v1/advertisers` with the new Step 2 fields →
+  `incomplete_step_3` status round-trips through resume; multi-country
+  targeting persists
+- All security headers from S3 still present
+
+### What's left in the wizard
+
+- **S5** — `AdCreativeStep` with file upload to `POST /api/v1/uploads`,
+  4-creative cap, drag-and-drop, allowed-dimensions UI
+- **S6** — Stripe checkout + webhook, payment success / cancel pages,
+  `pending_review` transition wired up
+- **S7** — PayPal checkout + webhook
+- **S12** — Marketing pages, BrandLogos, PublisherShowcase, CaseStudyPreview,
+  RamadanCountdownBanner, footer trust signals, "Powered by" footer
