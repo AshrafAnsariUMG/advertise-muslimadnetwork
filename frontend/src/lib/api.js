@@ -89,3 +89,53 @@ export function getAdvertiser(id, token) {
     method: 'GET',
   });
 }
+
+/**
+ * Kicks off Stripe Checkout. Returns `{ url }` — the caller should
+ * `window.location.href = url` to send the user into the Stripe-hosted page.
+ * Backend creates the session, stores the session id on the advertiser, and
+ * waits for the `checkout.session.completed` webhook to mark the record paid.
+ */
+export function createStripeCheckout(advertiserId, accessToken) {
+  return request('/api/v1/checkout/stripe', {
+    method: 'POST',
+    body: {
+      advertiser_id: advertiserId,
+      access_token: accessToken,
+    },
+  });
+}
+
+/**
+ * Creates a PayPal Order. Returns `{ order_id, approval_url }`. Send the
+ * user to `approval_url` to approve the payment on PayPal's domain. PayPal
+ * then redirects back to /payment/paypal-success which calls
+ * `capturePaypalOrder` to actually complete the charge.
+ */
+export function createPaypalCheckout(advertiserId, accessToken) {
+  return request('/api/v1/checkout/paypal', {
+    method: 'POST',
+    body: {
+      advertiser_id: advertiserId,
+      access_token: accessToken,
+    },
+  });
+}
+
+/**
+ * Captures a previously-approved PayPal Order. Returns
+ * `{ status, advertiser_id, redirect_to }` on success — `status` is `'paid'`
+ * when the capture completes, otherwise the request status code surfaces
+ * the failure (4xx for client/configuration issues, 502 if PayPal itself
+ * errored and the webhook is now the safety net).
+ */
+export function capturePaypalOrder(advertiserId, accessToken, orderId) {
+  return request('/api/v1/checkout/paypal/capture', {
+    method: 'POST',
+    body: {
+      advertiser_id: advertiserId,
+      access_token: accessToken,
+      order_id: orderId,
+    },
+  });
+}

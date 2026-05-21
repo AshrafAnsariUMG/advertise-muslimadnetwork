@@ -34,5 +34,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('uploads', function (Request $request) {
             return Limit::perHour(30)->by($request->ip());
         });
+
+        // Checkout session creation — short window, low ceiling. A user who's
+        // legitimately retrying after a Stripe redirect failure will hit this
+        // at most a couple of times.
+        RateLimiter::for('checkout', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
     }
 }

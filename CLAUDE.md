@@ -3,7 +3,7 @@
 **Type:** Migration from base44 (self-service ad-campaign onboarding platform)
 **Operator:** Ummah Media Group LLC
 **Developer:** Ashraf Ansari
-**Status:** S5 complete (2026-05-21) — S6 (Stripe checkout + webhook) is next
+**Status:** S7 complete (2026-05-21) — S8 (abandoned cart email) is next
 
 ---
 
@@ -236,8 +236,8 @@ couldn't enforce them:
 | **S3**  | ✅ 2026-05-20 — Wizard shell + Step 1 (BusinessInfo) with 1s-debounce auto-save against PATCH /api/v1/advertisers/{id}; shadcn/ui (base-ui flavoured for Tailwind v4) initialised; URL + localStorage resume; CORS for staging IP + production domain |
 | **S4**  | ✅ 2026-05-21 — Wizard Step 2 fully ported (CampaignSetupStep with CTV add-on, performance estimate, budget presets), LocationPicker (react-leaflet via dynamic ssr:false), BudgetRecommendation, Review shell with disabled payment buttons + Edit-back nav. State machine fixed: Step 2 → `incomplete_step_3`, not `pending_review` |
 | **S5**  | ✅ 2026-05-21 — `has_ctv` column added (renamed from client-only `include_ctv`); react-dropzone + shadcn Switch installed; AdCreativeStep with drag-drop, client-side dim/size/mime checks, per-file XHR progress, 4-creative cap, design service Switch, Target URL field; embedded into ReviewStep; validation gate requires ≥1 creative OR design_service=true |
-| **S6**  | Stripe checkout + webhook + PaymentSuccess/Cancelled/ApplicationSuccess pages |
-| **S7**  | PayPal checkout + webhook |
+| **S6**  | ✅ 2026-05-21 — Stripe Checkout (stripe/stripe-php ^20.1), config/stripe.php, processed_stripe_events table, CheckoutController + WebhookController, /payment/success polling, /payment/cancel, /application-success with confetti, Stripe button live. Code complete; **live API tests deferred until Stripe keys are pasted into .env.** |
+| **S7**  | ✅ 2026-05-21 — PayPal Orders v2 via Laravel Http facade (SDK not used — installed/removed); config/paypal.php; processed_paypal_events idempotency table; CheckoutController::paypal + paypalCapture; WebhookController::paypal (redundancy); /payment/paypal-success page; PayPal button live alongside Stripe. **Live API tests deferred until PayPal sandbox keys are pasted.** |
 | **S8**  | Abandoned cart email job + email template (after Ashraf confirms sender) |
 | **S9**  | Admin auth (UmmahPass) + AdminDashboard with Recharts metrics |
 | **S10** | AdminReview + AbandonedCarts pages + audit log writes |
@@ -976,3 +976,359 @@ live `<AdCreativeStep />`. Heading updated to "Ad Creatives & Target URL".
 - **`include_ctv` removal.** Older drafts created before 2026-05-21 have
   `has_ctv=NULL` in the DB. The boolean cast turns NULL into `false` on
   read; no migration backfill needed.
+
+---
+
+## S6 COMPLETION NOTES (2026-05-21)
+
+### Stripe stack
+
+- **`stripe/stripe-php ^20.1`** installed.
+- **`backend/config/stripe.php`** reads `publishable_key`, `secret_key`,
+  `webhook_secret`, `currency` (default `usd`, lowercased), and builds
+  `success_url`/`cancel_url` from `FRONTEND_URL` so cutover doesn't need
+  a Stripe-side config change.
+
+### Idempotency
+
+- **Migration `2026_05_21_100000_create_processed_stripe_events_table`** —
+  `event_id` unique (DB-level idempotency), `event_type`, nullable indexed
+  `advertiser_id` (some future events like `refund.created` won't have a
+  1:1 match), `processed_at` only (append-only).
+- **`App\Models\ProcessedStripeEvent`** — `HasUuids`, `$timestamps = false`.
+
+### Submission gate (refactored)
+
+Pulled the "required at submission" rules out of
+`UpdateAdvertiserRequest::withValidator()` and into a service:
+
+```php
+new App\Services\AdvertiserSubmissionGate()->errorsForAdvertiser($advertiser)
+// → ['business_name' => '...', ...] or [] when ready
+```
+
+Used by both the FormRequest (PATCH → `pending_review`) and the
+`CheckoutController` (POST /api/v1/checkout/stripe). One source of truth.
+
+### Endpoints
+
+| Method | Path                       | Throttle    | Notes |
+|--------|----------------------------|-------------|-------|
+| POST   | `/api/v1/checkout/stripe`  | 5/min/IP    | Body `{ advertiser_id, access_token }` → `{ url }` |
+| POST   | `/api/webhooks/stripe`     | **none**    | CSRF-exempt via `validateCsrfTokens(except: ['api/webhooks/*'])` in `bootstrap/app.php` |
+
+**CheckoutController** error states:
+- 404 — advertiser not found
+- 403 — access_token mismatch (`hash_equals`)
+- 409 — already paid
+- 422 — submission gate failed OR no creative & no design service
+- 502 — Stripe API error (surfaced as "Failed to start checkout")
+- 503 — `STRIPE_SECRET_KEY` empty (defensive — should never hit in prod)
+
+**Session params** built in `CheckoutController::sessionParams()`:
+- One line item for the campaign budget (`monthly_budget * 100` cents),
+  one for `design_service` ($200 = 20000 cents) if enabled
+- Campaign line description: `"{Objective} · {start} to {end}"` plus
+  `" (CTV inventory included)"` if `has_ctv` is true
+- `metadata.advertiser_id` and `payment_intent_data.metadata.advertiser_id`
+  — the webhook reads from either, depending on event type
+- `expires_at` = now + 24h (explicit; Stripe default)
+- Defensive assertion: line-items sum must equal
+  `Advertiser::calculateTotal()`; mismatch logs a warning
+
+**Session id** is stored on `advertiser.stripe_session_id` but **status is
+NOT changed at session-creation time** — the record stays at
+`incomplete_step_3` until the webhook fires.
+
+### Webhook flow
+
+1. Verify `Stripe-Signature` header against `STRIPE_WEBHOOK_SECRET`. Any
+   failure → 400 (no side effect).
+2. Look up `processed_stripe_events.event_id` → if present, return 200
+   "Already processed" (no work done).
+3. Inside a DB transaction:
+   - Dispatch on `event->type`:
+     - `checkout.session.completed` → find Advertiser by
+       `session.metadata.advertiser_id`; mark `payment_status=paid`,
+       `payment_method=stripe`, `stripe_payment_intent=session->payment_intent`,
+       `status=pending_review`.
+     - Other types → log and skip (but still write the ledger row so
+       Stripe doesn't retry forever).
+   - Insert `ProcessedStripeEvent` row.
+4. Return 200 "OK". Any unhandled exception → 500 so Stripe retries.
+
+**Re-delivery race:** if Stripe somehow double-delivers before the ledger
+row commits, the second handler hits the unique constraint on `event_id`
+and the transaction aborts cleanly — better than double-charging downstream.
+
+### Status state machine — UPDATED
+
+```
+incomplete_step_1 → incomplete_step_2 → incomplete_step_3
+                                              │
+                                              ▼
+                                    POST /checkout/stripe
+                                  (stripe_session_id set,
+                                   status UNCHANGED)
+                                              │
+                                              ▼
+                                    Stripe-hosted Checkout
+                                              │
+                                              ▼
+                          checkout.session.completed webhook
+                                              │
+                                              ▼
+                                       pending_review
+                                       payment_status=paid
+                                              │
+                                              ▼
+                                  approved / rejected
+                                  (S9 admin actions)
+                                              │
+                                              ▼
+                                       active / paused
+```
+
+**Key invariant:** `status='pending_review'` ONLY when the webhook confirms
+payment. A draft that never pays stays at `incomplete_step_3` and is an
+"abandoned cart" (S8 will email these).
+
+### Frontend changes
+
+- **`src/lib/api.js`** — added `createStripeCheckout(advertiserId, accessToken)`
+  → `POST /api/v1/checkout/stripe` → `{ url }`.
+- **`ReviewStep.jsx`** — Stripe button now conditionally renders:
+  - Enabled when `advertiserId && accessToken && (ad_creatives.length > 0 || design_service)`
+  - Click → `createStripeCheckout` → `window.location.href = url`
+  - Spinner + "Redirecting to Stripe…" while in-flight
+  - Toast on error
+  - Falls back to a tooltipped disabled state when the criteria aren't met
+    ("Upload at least one ad creative or enable the design service")
+- **PayPal button remains a tooltipped disabled stub** (S7 work).
+
+### New pages
+
+| Path                    | Behaviour |
+|-------------------------|-----------|
+| `/payment/success`      | 'use client', `useSearchParams` wrapped in `<Suspense>`. Polls `GET /api/v1/advertisers/{id}?token={token}` every 2s, max 15 attempts (30s total). On `payment_status=paid` → `clearDraft()` + `router.replace('/application-success')`. On timeout → friendly "processing, check your email" with a Continue button to `/application-success`. On stale draft (403/404) → also surfaces the timeout copy. |
+| `/payment/cancel`       | Static page — "No charge was made. Your draft is saved." + "Return to your draft" link to `/`. Contact email shown. |
+| `/application-success`  | Confetti via `canvas-confetti` (3 bursts from opposing edges, capped). "You're all set!" headline, 3-step "What happens next", contact links. Terminal page — no back-to-wizard CTA. |
+
+### canvas-confetti
+
+Added `canvas-confetti@^1.9.4`. SSR-safe because the import lives in a
+`'use client'` page that only fires confetti inside `useEffect`.
+
+### Smoke results
+
+- ✅ **A** — `config('stripe.publishable_key')` resolves (currently empty
+  string because keys not pasted yet); `currency=usd`; URLs built correctly
+- ✅ **B** — `POST /api/v1/checkout/stripe` with `{}` → 422 with structured
+  errors for both required fields
+- ✅ **B2** — Unknown `advertiser_id` → 404
+- ✅ **B3** — Webhook returns 500 "Webhook misconfigured" while
+  `STRIPE_WEBHOOK_SECRET` is empty (defensive guard). When the real secret
+  is pasted, an unsigned request will return 400 "Invalid signature".
+- ✅ **C-lite** — Minimal draft → POST /checkout/stripe → 422 listing all 11
+  missing required-at-submission fields
+- ✅ Build clean (5 static pages)
+- ✅ Both PM2 processes online
+
+### Deferred — needs real Stripe keys
+
+Tests **C** (real Stripe Session), **D** (Stripe CLI webhook), **E**
+(idempotency re-trigger) are blocked on Ashraf pasting:
+- `STRIPE_PUBLISHABLE_KEY=pk_...`
+- `STRIPE_SECRET_KEY=sk_...`
+- `STRIPE_WEBHOOK_SECRET=whsec_...`
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_...`
+
+Once pasted: `php artisan config:clear && php artisan config:cache && sudo pm2 restart advertise-backend`.
+
+### Open items
+
+- **Webhook secret at cutover.** The current `STRIPE_WEBHOOK_SECRET` is for
+  the test webhook endpoint. At S12 cutover, the live webhook endpoint must
+  be added in the Stripe Dashboard pointing at
+  `https://advertise.muslimadnetwork.com/api/webhooks/stripe`, and the new
+  signing secret pasted into the production `.env`.
+- **PayPal** lands in S7 — same idempotency table, same metadata pattern,
+  separate `payment_method='paypal'` write.
+- **Abandoned cart email** (S8) will scan for `status='incomplete_step_3'`
+  records older than N hours and send a recovery email with
+  `?return={id}&token={token}` to resume the wizard.
+
+---
+
+## S7 COMPLETION NOTES (2026-05-21)
+
+### Choice: Laravel Http facade, not paypal/paypal-server-sdk
+
+Installed `paypal/paypal-server-sdk ^2.2` to evaluate; uninstalled after
+inspection. The SDK ships 365+ model classes / 5.8 MB of code for what is
+effectively four HTTP calls in our integration (OAuth token, Orders create,
+Orders capture, webhook signature verify). It also doesn't include webhook
+signature verification — we'd still need raw HTTP for that one call.
+
+Going Http-facade direct keeps the integration auditable: every wire shape
+the next dev sees in the diff is a literal HTTP call. The same pattern
+already serves Stripe (where we use the official `stripe/stripe-php` SDK
+because Stripe's library is much leaner and includes verification utilities).
+
+### New backend files
+
+| File                                                              | Notes |
+|-------------------------------------------------------------------|-------|
+| `backend/config/paypal.php`                                       | Reads `PAYPAL_MODE/CLIENT_ID/CLIENT_SECRET/WEBHOOK_ID/CURRENCY` env; derives `api_url` from mode (sandbox vs live); 8h OAuth token cache TTL |
+| `backend/database/migrations/2026_05_21_102700_create_processed_paypal_events_table.php` | Idempotency ledger, **stores full event payload** in JSON (PayPal events vary more than Stripe's), `processed_at` nullable so we can flag ingested-but-failed |
+| `backend/app/Models/ProcessedPaypalEvent.php`                     | `HasUuids`, `$timestamps = false` |
+| `backend/app/Services/PayPalService.php`                          | `accessToken()` with Cache, `createOrder()`, `captureOrder()`, `verifyWebhookSignature()` |
+| `backend/app/Http/Controllers/Api/V1/CheckoutController.php`      | **+** `paypal()`, `paypalCapture()`, `resolveAdvertiserForCheckout()` (shared preflight) |
+| `backend/app/Http/Controllers/Api/WebhookController.php`          | **+** `paypal()`, `dispatchPaypalEvent()`, capture/denied handlers, `findAdvertiserFromEvent()` |
+
+### New frontend files
+
+| File                                                              | Notes |
+|-------------------------------------------------------------------|-------|
+| `frontend/src/app/payment/paypal-success/page.js`                 | Suspense-wrapped client page. Reads `?token=ORDER_ID&PayerID=...`, loads `(id, access_token)` from localStorage, calls capture, routes to `/application-success` on paid or `/payment/cancel?reason=paypal_failed` on fail |
+| `frontend/src/lib/api.js`                                         | **+** `createPaypalCheckout()`, `capturePaypalOrder()` |
+| `frontend/src/components/signup/ReviewStep.jsx`                   | PayPal button now live; `redirecting` state went from boolean to `'stripe' \| 'paypal' \| null` so only the in-flight button shows a spinner |
+
+### Endpoints
+
+| Method | Path                                  | Throttle    | Notes |
+|--------|---------------------------------------|-------------|-------|
+| POST   | `/api/v1/checkout/paypal`             | 5/min/IP    | `{ advertiser_id, access_token }` → `{ order_id, approval_url }` |
+| POST   | `/api/v1/checkout/paypal/capture`     | 5/min/IP    | `{ advertiser_id, access_token, order_id }` → `{ status: 'paid', redirect_to }` or 402/502 |
+| POST   | `/api/webhooks/paypal`                | **none**    | CSRF-exempt via the existing `api/webhooks/*` wildcard from S6 |
+
+### The two-step PayPal flow
+
+```
+[User clicks "Pay with PayPal" on /]
+         │
+         ▼
+POST /api/v1/checkout/paypal
+  - resolveAdvertiserForCheckout() (404/403/409/422 guards)
+  - PayPalService::createOrder() → { id, links }
+  - Save id to advertiser.paypal_order_id
+  - Return approval_url
+         │
+         ▼
+window.location.href = approval_url
+         │
+         ▼
+[ User approves on PayPal's domain  ]
+         │
+         ▼
+PayPal redirects to /payment/paypal-success?token=ORDER_ID&PayerID=...
+         │
+         ▼
+POST /api/v1/checkout/paypal/capture
+  - Token guard
+  - Verify order_id matches advertiser.paypal_order_id (hash_equals)
+  - PayPalService::captureOrder() → { status, capture_id }
+  - On COMPLETED:
+      payment_status=paid, payment_method=paypal,
+      paypal_payment_id=capture_id, status=pending_review
+  - Return { status: 'paid', redirect_to: '/application-success' }
+         │
+         ▼
+router.replace('/application-success')
+```
+
+### Stripe vs PayPal — webhook role inversion
+
+For **Stripe**, the webhook is the **primary** path that flips the
+advertiser to paid. Stripe Checkout is fully hosted; we get the user back
+on `/payment/success` but the actual confirmation lives in
+`checkout.session.completed`.
+
+For **PayPal**, the webhook is **redundancy only**. The two-step
+authorize-then-capture flow means our `paypalCapture` endpoint is what
+actually moves the money once the user returns. The webhook handles the
+edge case where the browser closes between PayPal's approval redirect and
+our capture call.
+
+Both webhook handlers:
+- Verify provider signature
+- Short-circuit on duplicate `event_id`
+- Wrap side effect + ledger insert in a single DB transaction
+- Return 500 on unhandled exceptions so the provider retries
+- Idempotent on a record already marked paid (no-op return)
+
+### Locating an advertiser from a PayPal event
+
+PayPal's payload shape varies by event type. `findAdvertiserFromEvent` walks
+four candidate paths in priority order:
+
+1. `resource.supplementary_data.related_ids.order_id`
+2. `resource.custom_id`
+3. `resource.purchase_units[0].reference_id` (we set this to advertiser UUID
+   on Order creation — the primary path for CAPTURE events)
+4. `resource.purchase_units[0].custom_id`
+
+If the candidate looks like a UUID, accept directly; otherwise treat it as
+a PayPal order id and look up by `paypal_order_id`.
+
+### Verify-signature implementation
+
+PayPal does **not** ship a native HMAC like Stripe. Instead, you POST the
+five `paypal-*` request headers plus your `webhook_id` plus the event body
+to `/v1/notifications/verify-webhook-signature`, and PayPal responds with
+`verification_status: SUCCESS|FAILURE`. We bail early if any of the five
+required headers are missing without calling PayPal at all.
+
+Cost: one extra HTTP round-trip per webhook, on top of OAuth (which our
+cache absorbs after the first call). Acceptable — webhooks aren't on the
+user's critical path.
+
+### Smoke results
+
+- ✅ Config: `mode=live`, `api_url=https://api-m.paypal.com`, `currency=USD`
+- ✅ B1: empty body → 422 with structured `errors`
+- ✅ B2: bogus advertiser → 404
+- ✅ C: wrong token → 403
+- ✅ C2: incomplete draft → 422 from submission gate (all 11 fields enumerated)
+- ✅ D: webhook returns 500 "Webhook misconfigured" while
+  `PAYPAL_WEBHOOK_ID` is empty (defensive guard, same pattern as Stripe).
+  With real webhook_id pasted, an unsigned request returns 400
+  "Invalid signature".
+- ✅ All 5 frontend pages return HTTP 200
+- ✅ Build clean — 6 static pages prerendered
+- ✅ All 3 PM2 processes online
+
+### Deferred — needs real PayPal sandbox keys
+
+End-to-end tests blocked on Ashraf populating:
+- `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` (sandbox or live, per
+  `PAYPAL_MODE`)
+- `PAYPAL_WEBHOOK_ID` (from the PayPal Developer dashboard's webhook
+  endpoint registration)
+
+After paste: `php artisan config:clear && php artisan config:cache && sudo pm2 restart advertise-backend`. Sandbox testing flow:
+1. Create a sandbox personal account in the PayPal Developer dashboard
+2. Visit http://37.27.215.90:3004, fill the wizard end-to-end with design
+   service enabled (so no creative upload needed)
+3. Click "Pay with PayPal", log in with the sandbox personal account, click
+   "Pay Now"
+4. PayPal redirects to /payment/paypal-success, capture call fires, user
+   lands on /application-success
+5. Verify `advertisers` row: `payment_status=paid`,
+   `payment_method=paypal`, `paypal_order_id` and `paypal_payment_id` set,
+   `status=pending_review`
+
+### S12 cutover TODO
+
+- **Webhook endpoint registration.** PayPal webhooks are registered in
+  the PayPal Developer dashboard per-app. At cutover we'll need to register
+  `https://advertise.muslimadnetwork.com/api/webhooks/paypal` for the LIVE
+  app and update `PAYPAL_WEBHOOK_ID` accordingly.
+- **Cloudflare WAF allowlist.** PayPal publishes their webhook IP ranges
+  in their docs — the WAF will need an allow rule covering those IPs for
+  the `/api/webhooks/paypal` path to prevent challenges on signed
+  callbacks.
+- **`PAYPAL_MODE=live`** must be confirmed at cutover. Currently set to
+  `live` in `.env` but with blank credentials — sandbox testing requires
+  toggling to `sandbox` and pasting sandbox keys, then switching back at
+  cutover.

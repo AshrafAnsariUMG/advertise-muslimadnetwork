@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\V1\AdvertiserController;
+use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\UploadController;
+use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [HealthController::class, 'index']);
@@ -24,4 +26,21 @@ Route::prefix('v1')->group(function () {
     Route::middleware('throttle:uploads')->group(function () {
         Route::post('/uploads', [UploadController::class, 'store']);
     });
+
+    Route::middleware('throttle:checkout')->group(function () {
+        Route::post('/checkout/stripe', [CheckoutController::class, 'stripe']);
+        Route::post('/checkout/paypal', [CheckoutController::class, 'paypal']);
+        Route::post('/checkout/paypal/capture', [CheckoutController::class, 'paypalCapture']);
+    });
 });
+
+/*
+ * Payment webhooks — intentionally OUTSIDE the v1 prefix and OUTSIDE any rate
+ * limiter or CSRF guard. Stripe and PayPal both retry failed deliveries with
+ * exponential backoff; throttling here would cause unnecessary retries and
+ * (worst case) double-process an event after our idempotency window. The
+ * CSRF exemption is wired in bootstrap/app.php — `api/webhooks/*` is in the
+ * validateCsrfTokens except list, so this covers /webhooks/paypal too.
+ */
+Route::post('/webhooks/stripe', [WebhookController::class, 'stripe']);
+Route::post('/webhooks/paypal', [WebhookController::class, 'paypal']);

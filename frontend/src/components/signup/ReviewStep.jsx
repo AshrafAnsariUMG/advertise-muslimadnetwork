@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import AdCreativeStep from './AdCreativeStep';
+import { createPaypalCheckout, createStripeCheckout } from '@/lib/api';
 
 const DATE_FMT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -71,6 +73,7 @@ export default function ReviewStep({
   onBack,
 }) {
   const paymentSectionRef = useRef(null);
+  const [redirecting, setRedirecting] = useState(null); // null | 'stripe' | 'paypal'
 
   // Auto-scroll to the payment section when the review loads (matches base44)
   useEffect(() => {
@@ -86,6 +89,48 @@ export default function ReviewStep({
   const totalAmount = calculateTotal(formData);
   const startDate = formatDate(formData.campaign_start_date);
   const endDate = formatDate(formData.campaign_end_date);
+
+  // Front-end mirror of the backend submission gate. Payment can be
+  // initiated only when this is true; the backend re-validates regardless.
+  const hasCreatives =
+    Array.isArray(formData.ad_creatives) && formData.ad_creatives.length > 0;
+  const canPay =
+    !!advertiserId &&
+    !!accessToken &&
+    (hasCreatives || !!formData.design_service);
+
+  const handleStripeCheckout = async () => {
+    if (!canPay || redirecting) return;
+    setRedirecting('stripe');
+    try {
+      const { url } = await createStripeCheckout(advertiserId, accessToken);
+      if (!url) {
+        throw new Error('No checkout URL returned. Please try again.');
+      }
+      window.location.href = url;
+    } catch (err) {
+      toast.error(err?.message || 'Could not start checkout. Please try again.');
+      setRedirecting(null);
+    }
+  };
+
+  const handlePaypalCheckout = async () => {
+    if (!canPay || redirecting) return;
+    setRedirecting('paypal');
+    try {
+      const { approval_url: approvalUrl } = await createPaypalCheckout(
+        advertiserId,
+        accessToken
+      );
+      if (!approvalUrl) {
+        throw new Error('No PayPal approval URL returned. Please try again.');
+      }
+      window.location.href = approvalUrl;
+    } catch (err) {
+      toast.error(err?.message || 'Could not start PayPal checkout. Please try again.');
+      setRedirecting(null);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -323,51 +368,109 @@ export default function ReviewStep({
           </div>
           <TooltipProvider delay={150}>
             <div className="grid grid-cols-2 gap-3">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <span className="block opacity-60 cursor-not-allowed" />
-                  }
+              {canPay ? (
+                <button
+                  type="button"
+                  onClick={handleStripeCheckout}
+                  disabled={!!redirecting}
+                  className="w-full flex flex-col items-center justify-center gap-2 h-20 rounded-xl border-2 border-indigo-300 bg-white hover:border-indigo-500 hover:shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <button
-                    type="button"
-                    disabled
-                    className="w-full flex flex-col items-center justify-center gap-2 h-20 rounded-xl border-2 border-indigo-200 bg-white pointer-events-none"
-                    aria-disabled="true"
+                  {redirecting === 'stripe' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600" />
+                      <span className="text-xs text-gray-600">
+                        Redirecting to Stripe…
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold text-indigo-700">
+                        Pay with Stripe
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium">
+                        Card / Bank
+                      </span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span className="block opacity-60 cursor-not-allowed" />
+                    }
                   >
-                    <span className="text-sm font-semibold text-indigo-700">
-                      Pay with Stripe
-                    </span>
-                    <span className="text-xs text-gray-500 font-medium">
-                      Card / Bank
-                    </span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Coming in next build session</TooltipContent>
-              </Tooltip>
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full flex flex-col items-center justify-center gap-2 h-20 rounded-xl border-2 border-indigo-200 bg-white pointer-events-none"
+                      aria-disabled="true"
+                    >
+                      <span className="text-sm font-semibold text-indigo-700">
+                        Pay with Stripe
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium">
+                        Card / Bank
+                      </span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Upload at least one ad creative or enable the design service.
+                  </TooltipContent>
+                </Tooltip>
+              )}
 
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <span className="block opacity-60 cursor-not-allowed" />
-                  }
+              {canPay ? (
+                <button
+                  type="button"
+                  onClick={handlePaypalCheckout}
+                  disabled={!!redirecting}
+                  className="w-full flex flex-col items-center justify-center gap-2 h-20 rounded-xl border-2 border-yellow-300 bg-white hover:border-yellow-400 hover:shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <button
-                    type="button"
-                    disabled
-                    className="w-full flex flex-col items-center justify-center gap-2 h-20 rounded-xl border-2 border-yellow-300 bg-white pointer-events-none"
-                    aria-disabled="true"
+                  {redirecting === 'paypal' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-500" />
+                      <span className="text-xs text-gray-600">
+                        Redirecting to PayPal…
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold text-yellow-700">
+                        Pay with PayPal
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium">
+                        PayPal
+                      </span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span className="block opacity-60 cursor-not-allowed" />
+                    }
                   >
-                    <span className="text-sm font-semibold text-yellow-700">
-                      Pay with PayPal
-                    </span>
-                    <span className="text-xs text-gray-500 font-medium">
-                      PayPal
-                    </span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Coming in next build session</TooltipContent>
-              </Tooltip>
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full flex flex-col items-center justify-center gap-2 h-20 rounded-xl border-2 border-yellow-300 bg-white pointer-events-none"
+                      aria-disabled="true"
+                    >
+                      <span className="text-sm font-semibold text-yellow-700">
+                        Pay with PayPal
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium">
+                        PayPal
+                      </span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Upload at least one ad creative or enable the design service.
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
           </TooltipProvider>
 

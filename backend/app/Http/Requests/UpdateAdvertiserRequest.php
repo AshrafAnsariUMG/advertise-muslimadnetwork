@@ -9,6 +9,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PurchaseType;
 use App\Enums\TargetGender;
+use App\Services\AdvertiserSubmissionGate;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -86,30 +87,9 @@ class UpdateAdvertiserRequest extends FormRequest
                 $this->all()
             );
 
-            $required = [
-                'business_name', 'business_type', 'contact_name', 'contact_email',
-                'contact_phone', 'campaign_name', 'campaign_objective',
-                'monthly_budget', 'campaign_start_date', 'campaign_end_date',
-                'ad_destination_url',
-            ];
-
-            foreach ($required as $field) {
-                if (empty($merged[$field])) {
-                    $v->errors()->add(
-                        $field,
-                        "The {$field} field is required to submit for review."
-                    );
-                }
-            }
-
-            // Must target either countries OR a location
-            $hasCountries = !empty($merged['target_countries']);
-            $hasLocation = !empty($merged['target_location']);
-            if (!$hasCountries && !$hasLocation) {
-                $v->errors()->add(
-                    'target_countries',
-                    'Either target_countries or target_location is required to submit for review.'
-                );
+            $gate = new AdvertiserSubmissionGate();
+            foreach ($gate->errorsFor($merged) as $field => $message) {
+                $v->errors()->add($field, $message);
             }
         });
     }

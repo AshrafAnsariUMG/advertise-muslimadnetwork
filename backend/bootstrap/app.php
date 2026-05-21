@@ -13,6 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->trustProxies(at: '*');
+
+        // Stripe (and later PayPal) webhooks POST with their own signature
+        // headers — there's no CSRF token for them to send. Exempt the
+        // webhook path from CSRF so the requests aren't 419'd.
+        $middleware->validateCsrfTokens(except: [
+            'api/webhooks/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
