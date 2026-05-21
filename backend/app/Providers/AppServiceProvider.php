@@ -47,6 +47,13 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->ip());
         });
 
+        // Admin login — slow brute-force without locking out the legit user.
+        // The 401 response shape doesn't leak whether the email exists, so
+        // attackers can't use the limit as an enumeration oracle either.
+        RateLimiter::for('admin-login', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
         /*
          * Custom Mail driver: gmail_api.
          *

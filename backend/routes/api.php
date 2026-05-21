@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\V1\AdvertiserController;
 use App\Http\Controllers\Api\V1\CheckoutController;
@@ -44,3 +46,23 @@ Route::prefix('v1')->group(function () {
  */
 Route::post('/webhooks/stripe', [WebhookController::class, 'stripe']);
 Route::post('/webhooks/paypal', [WebhookController::class, 'paypal']);
+
+/*
+ * Admin API — native email/password + Sanctum tokens.
+ *
+ * UmmahPass SSO migration is deferred until post-launch. When it lands, only
+ * the AuthController body changes; the middleware stack, route paths, and
+ * frontend Bearer-token contract stay identical.
+ */
+Route::prefix('admin')->group(function () {
+
+    Route::middleware('throttle:admin-login')
+        ->post('/auth/login', [AdminAuthController::class, 'login']);
+
+    Route::middleware(['auth:sanctum', 'is-admin'])->group(function () {
+        Route::post('/auth/logout', [AdminAuthController::class, 'logout']);
+        Route::get('/auth/me',     [AdminAuthController::class, 'me']);
+
+        Route::get('/dashboard/metrics', [AdminDashboardController::class, 'metrics']);
+    });
+});
