@@ -3,7 +3,7 @@
 **Type:** Migration from base44 (self-service ad-campaign onboarding platform)
 **Operator:** Ummah Media Group LLC
 **Developer:** Ashraf Ansari
-**Status:** S7 complete (2026-05-21) — S8 (abandoned cart email) is next
+**Status:** S8 complete (2026-05-21) — S9 (admin auth + dashboard) is next
 
 ---
 
@@ -238,7 +238,7 @@ couldn't enforce them:
 | **S5**  | ✅ 2026-05-21 — `has_ctv` column added (renamed from client-only `include_ctv`); react-dropzone + shadcn Switch installed; AdCreativeStep with drag-drop, client-side dim/size/mime checks, per-file XHR progress, 4-creative cap, design service Switch, Target URL field; embedded into ReviewStep; validation gate requires ≥1 creative OR design_service=true |
 | **S6**  | ✅ 2026-05-21 — Stripe Checkout (stripe/stripe-php ^20.1), config/stripe.php, processed_stripe_events table, CheckoutController + WebhookController, /payment/success polling, /payment/cancel, /application-success with confetti, Stripe button live. Code complete; **live API tests deferred until Stripe keys are pasted into .env.** |
 | **S7**  | ✅ 2026-05-21 — PayPal Orders v2 via Laravel Http facade (SDK not used — installed/removed); config/paypal.php; processed_paypal_events idempotency table; CheckoutController::paypal + paypalCapture; WebhookController::paypal (redundancy); /payment/paypal-success page; PayPal button live alongside Stripe. **Live API tests deferred until PayPal sandbox keys are pasted.** |
-| **S8**  | Abandoned cart email job + email template (after Ashraf confirms sender) |
+| **S8**  | ✅ 2026-05-21 — Gmail OAuth via custom `gmail_api` Symfony Mailer transport (mirrors reporting dashboard); PaymentConfirmation + AbandonedCartRecovery Mailables (queued); MattermostNotifier service + NotifyMattermostOfSubmission job; Stripe webhook + PayPal capture + PayPal redundancy webhook all fire fulfillment; SendAbandonedCartEmails (daily 10am NY) + CleanupOrphanCreatives (weekly Mondays 3am); system cron installed |
 | **S9**  | Admin auth (UmmahPass) + AdminDashboard with Recharts metrics |
 | **S10** | AdminReview + AbandonedCarts pages + audit log writes |
 | **S11** | Pipedrive integration — field/stage discovery + push jobs |
@@ -1332,3 +1332,128 @@ After paste: `php artisan config:clear && php artisan config:cache && sudo pm2 r
   `live` in `.env` but with blank credentials — sandbox testing requires
   toggling to `sandbox` and pasting sandbox keys, then switching back at
   cutover.
+
+---
+
+## S8 COMPLETION NOTES (2026-05-21)
+
+### Discovery: how reporting dashboard does Gmail
+
+| Project   | Package            | Pattern |
+|-----------|--------------------|---------|
+| reporting | `google/apiclient` | Direct service `App\Services\GmailMailerService` (raw Gmail v1 API). `MAIL_MAILER=log`. Callers explicitly do `app(GmailMailerService::class)->send($to, $subject, $html)`. |
+| advertise (S8) | `google/apiclient` | Same `GmailMailerService` copied verbatim (parity with reporting) **plus** a custom Symfony Mailer transport `App\Mail\Transport\GmailApiTransport` wired as Laravel mailer `gmail_api`. `MAIL_MAILER=gmail_api`. Callers use idiomatic `Mail::to()->queue(Mailable)`. |
+
+Why the split: the spec needs `Mail::to(...)->queue(new PaymentConfirmation(...))`
+to actually send (queueable Mailables can't pipe through reporting's bespoke
+service without bypassing Laravel's mail pipeline). The wrapper transport
+gives us Laravel-idiomatic ergonomics while still routing through the same
+Gmail OAuth refresh-token flow.
+
+### Env vars (copied from reporting verbatim — same Google app, same token)
+
+```
+MAIL_MAILER=gmail_api
+MAIL_FROM_ADDRESS=support@muslimadnetwork.com
+MAIL_FROM_NAME="Muslim Ad Network"
+GMAIL_OAUTH_CLIENT_ID=...
+GMAIL_OAUTH_CLIENT_SECRET=...
+GMAIL_FROM_ADDRESS=support@muslimadnetwork.com
+GMAIL_REFRESH_TOKEN=...
+MATTERMOST_WEBHOOK_URL_ADVERTISE=        # blank until Ashraf populates
+```
+
+**If the Gmail credentials rotate**, update BOTH
+`/var/www/muslimadnetwork-reporting/backend/.env` AND
+`/var/www/advertise-muslimadnetwork/backend/.env`. They are bound together
+by design.
+
+### New files
+
+| Path                                                              | Notes |
+|-------------------------------------------------------------------|-------|
+| `backend/app/Services/GmailMailerService.php`                     | Direct Gmail v1 API. Singleton-bound in AppServiceProvider so one access-token fetch covers all sends per worker lifetime. Adds a `sendRaw()` method used by the Symfony transport. |
+| `backend/app/Mail/Transport/GmailApiTransport.php`                | Symfony AbstractTransport subclass — serialises message to RFC-822 and hands to `GmailMailerService::sendRaw()` |
+| `backend/app/Mail/PaymentConfirmation.php`                        | Mailable, ShouldQueue. Subject "Your campaign has been submitted!", view `emails.payment-confirmation` |
+| `backend/app/Mail/AbandonedCartRecovery.php`                      | Mailable, ShouldQueue. Subject "Pick up where you left off", view `emails.abandoned-cart-recovery`. Builds resume URL from `FRONTEND_URL` + `?return={id}&token={access_token}` — relies on the access_token's secrecy in the customer's inbox |
+| `backend/app/Services/MattermostNotifier.php`                     | Posts to incoming webhook with 5s timeout. **Empty URL → log+skip, no exception** so payments work without it. All failures swallowed. |
+| `backend/app/Jobs/NotifyMattermostOfSubmission.php`               | ShouldQueue job wrapper, `tries=1` (notifications are nice-to-have) |
+| `backend/app/Console/Commands/SendAbandonedCartEmails.php`        | `advertisers:send-abandoned-cart-emails` — caps at 100 per run, flips `recovery_email_sent` flag after dispatch |
+| `backend/app/Console/Commands/CleanupOrphanCreatives.php`         | `creatives:cleanup-orphans [--dry-run]` — purges entire directories for deleted/trashed advertisers, prunes individual files not in the live `ad_creatives` array |
+| `backend/resources/views/emails/layout.blade.php`                 | 600px container, inline styles, indigo gradient header, address footer |
+| `backend/resources/views/emails/payment-confirmation.blade.php`   | Personalised greeting, campaign summary table, "what happens next" 3-step list |
+| `backend/resources/views/emails/abandoned-cart-recovery.blade.php`| Personalised, CTA button to resume URL, soft "ignore this" footer |
+
+### Payment fulfillment wiring
+
+A static method `WebhookController::fireSubmissionFulfillment(Advertiser)`
+dispatches **both** the confirmation email and the Mattermost job. It's
+called from three places:
+
+| Code path                                       | When |
+|------------------------------------------------|------|
+| `WebhookController::handleCheckoutCompleted`    | Stripe webhook (primary Stripe path) |
+| `CheckoutController::paypalCapture`             | PayPal capture endpoint (primary PayPal path) |
+| `WebhookController::handlePaypalCaptureCompleted` | PayPal webhook (redundancy — only fires when the synchronous capture never completed; the existing "already paid" early-return ensures we don't double-fire) |
+
+Both dispatches are wrapped in try/catch with error logging — mail/Mattermost
+failures must never propagate up to the webhook response (which would cause
+Stripe to retry).
+
+### Console commands + scheduler
+
+```
+$ php artisan schedule:list
+  0 14 * * *  php artisan advertisers:send-abandoned-cart-emails
+  0 3  * * 1  php artisan creatives:cleanup-orphans
+```
+
+- **`advertisers:send-abandoned-cart-emails`** — daily at 10:00
+  America/New_York (= 14:00 UTC in summer / 15:00 UTC in winter). Targets
+  `status='incomplete_step_3'` AND `recovery_email_sent=false` AND
+  `created_at < now()-24h` AND has `contact_email`. Caps at 100/run.
+- **`creatives:cleanup-orphans`** — weekly Mondays 03:00 server local.
+  Removes entire directories for deleted/trashed advertisers, prunes
+  individual files no longer referenced by `ad_creatives[*].file_url`.
+  Supports `--dry-run` for safe preview.
+
+### System cron (root crontab)
+
+```
+* * * * * cd /var/www/advertise-muslimadnetwork/backend && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Installed via `sudo crontab -u root -`. Verify with `sudo crontab -u root -l`.
+The cron daemon (`systemd cron.service`) is `active` on this VPS.
+
+### Smoke results
+
+- ✅ **A**: `Mail::raw(...)` → real Gmail API call → returned cleanly.
+  `Mail::to()->send(new PaymentConfirmation($adv))` → also OK. Both should
+  have landed in `admin@muslimadnetwork.com` (Ashraf verifies inbox).
+- ✅ **B**: `MattermostNotifier::notifyNewSubmission()` with empty URL →
+  returns cleanly, no exception. (No log line visible because
+  `LOG_LEVEL=error` suppresses the `Log::info('skipping')` — intentional;
+  flipping to warning would spam logs once Mattermost is wired.)
+- ✅ **C**: Synthetic backdated `incomplete_step_3` draft → command dispatched
+  1 email, `recovery_email_sent=true`, `recovery_email_sent_date` populated;
+  re-run was a clean 0.
+- ✅ **D**: `creatives:cleanup-orphans` — bonus win, actually found and
+  removed 2 real orphans from earlier-session smoke tests (S2 + S5 left
+  behind root-owned dirs we couldn't delete inline). Real run + `--dry-run`
+  both clean.
+- ✅ **E**: `schedule:list` shows both commands with correct next-run times.
+
+### TODO for S12 cutover
+
+- **`FRONTEND_URL`** in advertise `.env` is currently
+  `http://37.27.215.90:3004` (staging direct-IP). At cutover this must flip
+  to `https://advertise.muslimadnetwork.com` so the AbandonedCartRecovery
+  email's resume URL points at the production host.
+- **`MATTERMOST_WEBHOOK_URL_ADVERTISE`** — Ashraf provisions an incoming
+  webhook in the Mattermost dashboard (chat.ummahmediagroup.com) and pastes
+  the URL into `.env`. No code change needed; the system runs cleanly until
+  then.
+- **Gmail send quota** — Google's per-day send limit for a regular Google
+  Workspace account is ~2000 messages. We're well under that, but if the
+  abandoned-cart volume grows materially we should monitor.

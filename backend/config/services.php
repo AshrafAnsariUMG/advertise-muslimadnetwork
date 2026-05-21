@@ -35,4 +35,26 @@ return [
         ],
     ],
 
+    /*
+     * Gmail API credentials — mirrors the reporting dashboard
+     * (/var/www/muslimadnetwork-reporting/backend) so both projects share a
+     * single Google OAuth app and refresh token. See GmailMailerService and
+     * GmailApiTransport.
+     */
+    'gmail' => [
+        'client_id'     => env('GMAIL_OAUTH_CLIENT_ID'),
+        'client_secret' => env('GMAIL_OAUTH_CLIENT_SECRET'),
+        'refresh_token' => env('GMAIL_REFRESH_TOKEN'),
+        'from_address'  => env('GMAIL_FROM_ADDRESS'),
+    ],
+
+    /*
+     * Mattermost incoming webhook for "new paid signup" notifications. Empty
+     * URL → MattermostNotifier returns early without erroring, so payment
+     * processing keeps working until Ashraf provisions the webhook.
+     */
+    'mattermost' => [
+        'advertise_webhook_url' => env('MATTERMOST_WEBHOOK_URL_ADVERTISE'),
+    ],
+
 ];

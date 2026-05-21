@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Mail\Transport\GmailApiTransport;
+use App\Services\GmailMailerService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -11,7 +14,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Singleton — fetching a Gmail access token does a network round-trip
+        // and we'd rather not repeat it for every Mailable in a queue worker.
+        $this->app->singleton(GmailMailerService::class, fn () => new GmailMailerService());
     }
 
     public function boot(): void
@@ -40,6 +45,18 @@ class AppServiceProvider extends ServiceProvider
         // at most a couple of times.
         RateLimiter::for('checkout', function (Request $request) {
             return Limit::perMinute(5)->by($request->ip());
+        });
+
+        /*
+         * Custom Mail driver: gmail_api.
+         *
+         * Setting MAIL_MAILER=gmail_api in .env routes all Laravel mail
+         * (Mail::raw, Mail::to()->send(), queued Mailables) through this
+         * transport, which serialises the message to RFC-822 and posts it
+         * via the Google Gmail v1 API.
+         */
+        Mail::extend('gmail_api', function () {
+            return new GmailApiTransport(app(GmailMailerService::class));
         });
     }
 }

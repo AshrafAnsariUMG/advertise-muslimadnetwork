@@ -37,6 +37,16 @@ return [
 
     'mailers' => [
 
+        /*
+         * gmail_api — custom transport registered in AppServiceProvider.
+         * Sends via the Gmail v1 API using an OAuth2 refresh token. Same
+         * credentials as the reporting dashboard. Set MAIL_MAILER=gmail_api
+         * in .env to use this as the default.
+         */
+        'gmail_api' => [
+            'transport' => 'gmail_api',
+        ],
+
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),

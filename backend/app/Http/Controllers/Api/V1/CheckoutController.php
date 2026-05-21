@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\AdvertiserStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Http\Controllers\Api\WebhookController;
 use App\Http\Controllers\Controller;
 use App\Models\Advertiser;
 use App\Services\AdvertiserSubmissionGate;
@@ -378,6 +379,12 @@ class CheckoutController extends Controller
         }
 
         $advertiser->save();
+
+        // Synchronous PayPal capture path — this is where the customer-facing
+        // confirmation and internal Mattermost ping fire for PayPal. The
+        // webhook handler only fires fulfillment as a redundancy if this
+        // endpoint never ran (browser closed mid-redirect, etc.).
+        WebhookController::fireSubmissionFulfillment($advertiser);
 
         return response()->json([
             'status'        => 'paid',

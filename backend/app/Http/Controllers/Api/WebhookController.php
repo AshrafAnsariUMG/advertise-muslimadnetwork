@@ -6,6 +6,8 @@ use App\Enums\AdvertiserStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
+use App\Jobs\NotifyMattermostOfSubmission;
+use App\Mail\PaymentConfirmation;
 use App\Models\Advertiser;
 use App\Models\ProcessedPaypalEvent;
 use App\Models\ProcessedStripeEvent;
@@ -14,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Stripe\Event as StripeEvent;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Webhook;
@@ -151,7 +154,47 @@ class WebhookController extends Controller
             'advertiser_id' => $advertiser->id,
         ]);
 
+        $this->fireSubmissionFulfillment($advertiser);
+
         return $advertiser->id;
+    }
+
+    /**
+     * Sends the customer-facing confirmation email + posts the internal
+     * Mattermost notification. Both are queued so the webhook responds fast.
+     *
+     * This method is called from every code path that flips an advertiser to
+     * payment_status=paid:
+     *   - Stripe webhook checkout.session.completed (the primary Stripe path)
+     *   - PayPal capture endpoint (the primary PayPal path)
+     *   - PayPal webhook PAYMENT.CAPTURE.COMPLETED (only when it's the one
+     *     doing the flip — i.e., the capture endpoint never ran successfully)
+     *
+     * Callers are responsible for only invoking this on the state transition
+     * itself, not on every "already paid" re-entry.
+     */
+    public static function fireSubmissionFulfillment(Advertiser $advertiser): void
+    {
+        try {
+            if ($advertiser->contact_email) {
+                Mail::to($advertiser->contact_email)
+                    ->queue(new PaymentConfirmation($advertiser));
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to queue payment confirmation email', [
+                'advertiser_id' => $advertiser->id,
+                'error'         => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            NotifyMattermostOfSubmission::dispatch($advertiser);
+        } catch (\Throwable $e) {
+            Log::error('Failed to dispatch Mattermost notification', [
+                'advertiser_id' => $advertiser->id,
+                'error'         => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -290,6 +333,11 @@ class WebhookController extends Controller
         Log::info('PayPal webhook: advertiser marked paid via webhook recovery', [
             'advertiser_id' => $advertiser->id,
         ]);
+
+        // Webhook is the redundancy path — if we got here it means the
+        // synchronous capture endpoint never finished, so fulfillment
+        // (confirmation email + Mattermost) hasn't fired yet.
+        self::fireSubmissionFulfillment($advertiser);
 
         return $advertiser->id;
     }
