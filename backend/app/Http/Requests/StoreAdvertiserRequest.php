@@ -56,6 +56,7 @@ class StoreAdvertiserRequest extends FormRequest
             'ad_creatives'             => ['nullable', 'array', 'max:4'],
             'ad_destination_url'       => ['nullable', 'url', 'max:500'],
             'design_service'           => ['nullable', 'boolean'],
+            'has_ctv'                  => ['nullable', 'boolean'],
 
             // Payment (controlled by webhooks normally, but allowed for completeness)
             'payment_method'           => ['nullable', Rule::enum(PaymentMethod::class)],

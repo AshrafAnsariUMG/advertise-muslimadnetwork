@@ -222,7 +222,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
     Math.round(((ctvBudget * (2 / 3)) / CPM) * 1000 / 10000) * 10000;
   const ctvTotalViews = ctvDigitalViews + ctvTvViews;
 
-  const budgetMin = formData.include_ctv ? 1500 : 250;
+  const budgetMin = formData.has_ctv ? 1500 : 250;
   const budgetMax = 10000;
   const budgetPercentage =
     (((formData.monthly_budget || 500) - 250) / (budgetMax - 250)) * 100;
@@ -369,12 +369,12 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
               key={preset.value}
               type="button"
               onClick={() =>
-                !formData.include_ctv &&
+                !formData.has_ctv &&
                 updateFormData({ monthly_budget: preset.value })
               }
-              disabled={!!formData.include_ctv}
+              disabled={!!formData.has_ctv}
               className={`relative p-4 rounded-xl border-2 transition-all text-left ${
-                formData.include_ctv ? 'opacity-40 cursor-not-allowed' : ''
+                formData.has_ctv ? 'opacity-40 cursor-not-allowed' : ''
               } ${
                 formData.monthly_budget === preset.value
                   ? `${colors.border} ${colors.bg} shadow-md`
@@ -406,7 +406,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
           ))}
         </div>
 
-        {formData.include_ctv && (
+        {formData.has_ctv && (
           <p className="text-xs text-purple-600 text-center -mt-2 mb-1">
             Minimum $1,500/month required for Streaming TV Ads
           </p>
@@ -432,7 +432,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
           />
         </div>
         <div className="flex justify-between text-sm text-gray-500">
-          <span>{formData.include_ctv ? '$1,500' : '$250'}</span>
+          <span>{formData.has_ctv ? '$1,500' : '$250'}</span>
           <span>$2,500</span>
           <span>$5,000</span>
           <span>$7,500</span>
@@ -451,7 +451,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
           !formData.campaign_objective) && (
           <div
             className={`mt-4 rounded-xl border-2 transition-all ${
-              formData.include_ctv
+              formData.has_ctv
                 ? 'border-purple-300 bg-white'
                 : 'border-purple-200 bg-purple-50/50'
             }`}
@@ -460,23 +460,23 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
               <div className="flex items-start gap-6 mb-6">
                 <div className="flex items-start gap-4 flex-1">
                   <Checkbox
-                    id="include_ctv"
-                    checked={!!formData.include_ctv}
+                    id="has_ctv"
+                    checked={!!formData.has_ctv}
                     onCheckedChange={(checked) => {
                       if (checked) {
                         updateFormData({
-                          include_ctv: true,
+                          has_ctv: true,
                           monthly_budget: 1500,
                         });
                       } else {
-                        updateFormData({ include_ctv: false });
+                        updateFormData({ has_ctv: false });
                       }
                     }}
                     className="mt-1"
                   />
                   <div className="flex-1">
                     <label
-                      htmlFor="include_ctv"
+                      htmlFor="has_ctv"
                       className="flex items-center gap-2 cursor-pointer mb-2"
                     >
                       <div className="w-6 h-6 rounded bg-purple-100 flex items-center justify-center">
@@ -568,7 +568,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                 )}
               </div>
 
-              {formData.include_ctv &&
+              {formData.has_ctv &&
               formData.campaign_objective === 'brand_awareness' ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-3 text-center">

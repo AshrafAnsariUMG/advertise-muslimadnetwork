@@ -3,7 +3,7 @@
 **Type:** Migration from base44 (self-service ad-campaign onboarding platform)
 **Operator:** Ummah Media Group LLC
 **Developer:** Ashraf Ansari
-**Status:** S4 complete (2026-05-21) — S5 (ad creative upload UI) is next
+**Status:** S5 complete (2026-05-21) — S6 (Stripe checkout + webhook) is next
 
 ---
 
@@ -235,7 +235,7 @@ couldn't enforce them:
 | **S2**  | ✅ 2026-05-20 — Data layer: 8 enums, 4 migrations (advertisers, audit_logs, users.role, personal_access_tokens), 3 models, 3 FormRequests, 3 controllers (Advertiser/Upload/Health), 4 rate-limited routes, storage:link, 6+ curl smoke tests passed |
 | **S3**  | ✅ 2026-05-20 — Wizard shell + Step 1 (BusinessInfo) with 1s-debounce auto-save against PATCH /api/v1/advertisers/{id}; shadcn/ui (base-ui flavoured for Tailwind v4) initialised; URL + localStorage resume; CORS for staging IP + production domain |
 | **S4**  | ✅ 2026-05-21 — Wizard Step 2 fully ported (CampaignSetupStep with CTV add-on, performance estimate, budget presets), LocationPicker (react-leaflet via dynamic ssr:false), BudgetRecommendation, Review shell with disabled payment buttons + Edit-back nav. State machine fixed: Step 2 → `incomplete_step_3`, not `pending_review` |
-| **S5**  | AdCreativeStep — upload flow with server-side dimension validation |
+| **S5**  | ✅ 2026-05-21 — `has_ctv` column added (renamed from client-only `include_ctv`); react-dropzone + shadcn Switch installed; AdCreativeStep with drag-drop, client-side dim/size/mime checks, per-file XHR progress, 4-creative cap, design service Switch, Target URL field; embedded into ReviewStep; validation gate requires ≥1 creative OR design_service=true |
 | **S6**  | Stripe checkout + webhook + PaymentSuccess/Cancelled/ApplicationSuccess pages |
 | **S7**  | PayPal checkout + webhook |
 | **S8**  | Abandoned cart email job + email template (after Ashraf confirms sender) |
@@ -860,3 +860,119 @@ OpenStreetMap is the tile provider (no API key, attribution shown).
 - **S7** — PayPal checkout + webhook
 - **S12** — Marketing pages, BrandLogos, PublisherShowcase, CaseStudyPreview,
   RamadanCountdownBanner, footer trust signals, "Powered by" footer
+
+---
+
+## S5 COMPLETION NOTES (2026-05-21)
+
+### Backend changes
+
+- **Migration `2026_05_21_091700_add_has_ctv_to_advertisers_table`** — adds
+  `has_ctv boolean default false` after `design_service`. Naming matches the
+  reporting dashboard's `has_ctv` so a CTV-flagged signup here maps 1:1 to a
+  CM360 record there.
+- **`Advertiser` model** — `has_ctv` cast to boolean. Already fillable
+  because the model uses `$guarded` (only `id`, `access_token`, timestamps,
+  and `deleted_at` are guarded).
+- **`StoreAdvertiserRequest` + `UpdateAdvertiserRequest`** — new rule
+  `'has_ctv' => ['nullable', 'boolean']`. Now round-trips through
+  `validated()`.
+- Verified end-to-end: POST with `has_ctv:true` → GET returns `has_ctv:true`.
+
+### Frontend changes
+
+- **`CampaignSetupStep.jsx`** — all 13 references to `include_ctv` renamed
+  to `has_ctv`. CTV toggle now persists across refresh.
+- **`react-dropzone@latest`** installed.
+- **shadcn `switch` component** added — wraps `@base-ui/react/switch`,
+  `checked` + `onCheckedChange` API.
+
+### New component: `AdCreativeStep.jsx`
+
+Three sections, top to bottom:
+
+1. **Upload Your Ad Creatives** — visual guide showing all 4 allowed sizes
+   as scaled rectangles (drag-drop hits work as the user can see what's
+   acceptable); react-dropzone area; per-file XHR upload progress; uploaded
+   creative cards with thumbnail + dimension label + file size + remove
+   button.
+2. **Design service toggle** — Switch component, $200 add-on. Enabling it
+   clears any uploaded creatives (the user is choosing to start over) and
+   disables the drop zone with an explainer.
+3. **Target URL** — required for the campaign to actually run. Pre-fills
+   from `formData.website_url` if empty. URL format validated inline.
+
+**Drop zone state machine:**
+
+| State                | Behaviour |
+|----------------------|-----------|
+| No advertiser yet    | Disabled — "Finish Step 1 first" |
+| Design service ON    | Disabled — "Design service selected" |
+| At 4-creative cap    | Disabled — "Maximum 4 creatives reached" |
+| Drag active          | Highlighted indigo |
+| Idle                 | "Click to upload or drag and drop · N slots remaining" |
+
+**Client-side validation** runs before each upload — size ≤ 2&nbsp;MB, MIME
+in `image/jpeg|jpg|png`, dimensions match one of the 4 allowed sizes. Each
+rejection surfaces a sonner toast naming the file and the reason. Server-side
+validation in `UploadController` remains the authoritative gate.
+
+**Upload mechanics** — XMLHttpRequest with `xhr.upload.onprogress` so the
+percentage in the inline progress bar is real upload progress, not a spinner.
+Uploads run sequentially (not in parallel) to keep the UX intelligible and
+play nicely with the `uploads` rate limiter (30/h/IP).
+
+**Remove flow** — `window.confirm` then splice from `formData.ad_creatives`.
+The deleted creative's file on disk is **not** removed (PHP runs as root
+under PM2, claude-dev can't `rm` it from API code; we'd need a cleanup job
+that runs as root or via artisan). **TODO:** schedule a nightly artisan
+command that compares files on disk under `storage/app/public/ad-creatives/`
+against the `ad_creatives` arrays in `advertisers` and deletes orphans
+(combine with the 90-day unpaid-draft PII cleanup from S8 scope).
+
+### Validation gate (page.js)
+
+`validateStep()` for `currentStep === 2`:
+
+```
+hasCreatives = Array.isArray(formData.ad_creatives) && formData.ad_creatives.length > 0
+hasDesign    = formData.design_service === true
+if (!hasCreatives && !hasDesign) → error "Please upload at least one ad
+   creative or enable the design service"
+```
+
+This guard sits in front of the payment buttons. Payment buttons remain
+disabled stubs (S6/S7) but when they activate they'll be gated by this
+check.
+
+### `ReviewStep`
+
+Previous "Ad creative uploads come in S5" placeholder card replaced with the
+live `<AdCreativeStep />`. Heading updated to "Ad Creatives & Target URL".
+`updateFormData`, `advertiserId`, `accessToken` all now passed through.
+
+### Build + smoke
+
+- `npm run build` — clean, 4 static pages, no warnings
+- `curl localhost:3004` — 200, wizard headline + badge present
+- `POST /api/v1/uploads` with bogus IDs → 422 with structured `errors`
+- End-to-end: POST advertiser → GD-generated 300×250 PNG → POST /uploads →
+  201 with `dimension_label="300×250 (Medium Rectangle)"`, file stored at
+  `storage/app/public/ad-creatives/{id}/{uuid}.png` (root-owned, served via
+  `/storage/...`)
+
+### Known follow-ups
+
+- **Orphan file cleanup.** When the user removes a creative from
+  `ad_creatives`, the underlying file stays on disk. Schedule a nightly
+  artisan command in S8 to sweep up orphans (must run as root because PM2
+  owns the files).
+- **`payment_status === 'paid'` lock.** Editing creatives after payment is
+  blocked by the existing 409 on PATCH. Good.
+- **Multiple-upload UX edge.** If the user drops 5 files when 2 are already
+  uploaded, dropzone's `maxFiles` would reject the lot — we override by
+  trimming to `remainingSlots` and showing a sonner warning. Verified by
+  inspection; needs browser-side QA from Ashraf.
+- **`include_ctv` removal.** Older drafts created before 2026-05-21 have
+  `has_ctv=NULL` in the DB. The boolean cast turns NULL into `false` on
+  read; no migration backfill needed.

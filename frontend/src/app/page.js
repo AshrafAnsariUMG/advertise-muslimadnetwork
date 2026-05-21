@@ -269,7 +269,21 @@ export default function AdvertiserSignupPage() {
       return true;
     }
 
-    // Step 2 (review) — no inline validation; payment will land in S6/S7
+    if (currentStep === 2) {
+      // Before payment can be initiated (S6/S7), the user must either upload
+      // at least one creative OR opt into the design service.
+      const hasCreatives =
+        Array.isArray(formData.ad_creatives) &&
+        formData.ad_creatives.length > 0;
+      if (!hasCreatives && !formData.design_service) {
+        setError(
+          'Please upload at least one ad creative or enable the design service'
+        );
+        return false;
+      }
+      return true;
+    }
+
     return true;
   };
 

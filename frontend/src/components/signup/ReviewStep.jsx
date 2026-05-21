@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   Pencil,
 } from 'lucide-react';
+import AdCreativeStep from './AdCreativeStep';
 
 const DATE_FMT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -61,15 +62,10 @@ function SectionHeader({ icon: Icon, title, onEdit }) {
   );
 }
 
-// eslint-disable-next-line no-unused-vars
 export default function ReviewStep({
   formData,
-  // updateFormData kept for prop-shape parity with other steps; not used here
-  // eslint-disable-next-line no-unused-vars
   updateFormData,
-  // eslint-disable-next-line no-unused-vars
   advertiserId,
-  // eslint-disable-next-line no-unused-vars
   accessToken,
   onEditSection,
   onBack,
@@ -261,15 +257,16 @@ export default function ReviewStep({
           </CardContent>
         </Card>
 
-        {/* Ad Creatives — placeholder */}
+        {/* Ad Creatives — upload + design-service toggle live here */}
         <Card className="border-indigo-100 shadow-sm">
-          <SectionHeader icon={ImageIcon} title="Ad Creatives" />
+          <SectionHeader icon={ImageIcon} title="Ad Creatives & Target URL" />
           <CardContent>
-            <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
-              Ad creative uploads come in the next build session (S5). You will
-              upload up to 4 banner images at the allowed IAB sizes (300×250,
-              728×90, 160×600, 320×50).
-            </div>
+            <AdCreativeStep
+              formData={formData}
+              updateFormData={updateFormData}
+              advertiserId={advertiserId}
+              accessToken={accessToken}
+            />
           </CardContent>
         </Card>
 

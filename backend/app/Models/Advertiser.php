@@ -42,6 +42,7 @@ class Advertiser extends Model
         'target_location'          => 'array',
         'ad_creatives'             => 'array',
         'design_service'           => 'boolean',
+        'has_ctv'                  => 'boolean',
         'recovery_email_sent'      => 'boolean',
         'pushed_to_pipedrive'      => 'boolean',
         'monthly_budget'           => 'decimal:2',
