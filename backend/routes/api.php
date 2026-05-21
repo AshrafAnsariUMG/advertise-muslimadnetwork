@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AbandonedController as AdminAbandonedController;
 use App\Http\Controllers\Api\Admin\AdvertiserController as AdminAdvertiserController;
 use App\Http\Controllers\Api\Admin\AuditLogController as AdminAuditLogController;
 use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
@@ -78,5 +79,12 @@ Route::prefix('admin')->group(function () {
 
         // Read-only audit log
         Route::get('/audit-logs', [AdminAuditLogController::class, 'index']);
+
+        // Abandoned carts admin
+        Route::get('/abandoned', [AdminAbandonedController::class, 'index']);
+        Route::post('/abandoned/{id}/send-recovery', [AdminAbandonedController::class, 'sendRecovery']);
+        Route::post('/abandoned/{id}/push-pipedrive', [AdminAbandonedController::class, 'pushPipedrive']);
+        Route::post('/abandoned/bulk-send-recovery', [AdminAbandonedController::class, 'bulkSendRecovery']);
+        Route::post('/abandoned/bulk-push-pipedrive', [AdminAbandonedController::class, 'bulkPushPipedrive']);
     });
 });

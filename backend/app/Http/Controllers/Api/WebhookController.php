@@ -7,6 +7,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\NotifyMattermostOfSubmission;
+use App\Jobs\PushAdvertiserToPipedrive;
 use App\Mail\PaymentConfirmation;
 use App\Models\Advertiser;
 use App\Models\ProcessedPaypalEvent;
@@ -191,6 +192,20 @@ class WebhookController extends Controller
             NotifyMattermostOfSubmission::dispatch($advertiser);
         } catch (\Throwable $e) {
             Log::error('Failed to dispatch Mattermost notification', [
+                'advertiser_id' => $advertiser->id,
+                'error'         => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            // Fire-and-forget. Pipedrive being down (or unconfigured) must
+            // not block the payment-confirmation response. The job handles
+            // its own retries and logs final failures for operator follow-up.
+            if (!$advertiser->pushed_to_pipedrive) {
+                PushAdvertiserToPipedrive::dispatch($advertiser, 'paid');
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to dispatch Pipedrive push', [
                 'advertiser_id' => $advertiser->id,
                 'error'         => $e->getMessage(),
             ]);

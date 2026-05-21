@@ -74,7 +74,9 @@ function AdminShell({ children }) {
               <NavLink href="/admin/review" pathname={pathname}>
                 Review
               </NavLink>
-              <DisabledNavLink label="Abandoned" tooltip="Coming in S11" />
+              <NavLink href="/admin/abandoned" pathname={pathname}>
+                Abandoned
+              </NavLink>
               <NavLink href="/admin/audit" pathname={pathname}>
                 Audit
               </NavLink>
