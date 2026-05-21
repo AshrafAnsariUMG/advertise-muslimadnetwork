@@ -42,3 +42,11 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Operator / agent context — kept local only.
+# CLAUDE.md sometimes captures secrets at first-seed time (admin password,
+# webhook secrets surfaced during testing). The .claude/ folder holds
+# session memory, settings, and tool transcripts. Neither belongs in a
+# shared remote.
+CLAUDE.md
+.claude/

@@ -71,12 +71,13 @@ function AdminShell({ children }) {
               <NavLink href="/admin" pathname={pathname}>
                 Dashboard
               </NavLink>
-              <DisabledNavLink label="Review" tooltip="Coming next session" />
-              <DisabledNavLink
-                label="Abandoned"
-                tooltip="Coming next session"
-              />
-              <DisabledNavLink label="Audit" tooltip="Coming next session" />
+              <NavLink href="/admin/review" pathname={pathname}>
+                Review
+              </NavLink>
+              <DisabledNavLink label="Abandoned" tooltip="Coming in S11" />
+              <NavLink href="/admin/audit" pathname={pathname}>
+                Audit
+              </NavLink>
             </nav>
           </div>
 

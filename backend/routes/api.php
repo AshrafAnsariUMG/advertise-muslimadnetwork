@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AdvertiserController as AdminAdvertiserController;
+use App\Http\Controllers\Api\Admin\AuditLogController as AdminAuditLogController;
 use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\HealthController;
@@ -64,5 +66,17 @@ Route::prefix('admin')->group(function () {
         Route::get('/auth/me',     [AdminAuthController::class, 'me']);
 
         Route::get('/dashboard/metrics', [AdminDashboardController::class, 'metrics']);
+
+        // Advertiser admin CRUD + lifecycle
+        Route::get('/advertisers',          [AdminAdvertiserController::class, 'index']);
+        Route::get('/advertisers/{id}',     [AdminAdvertiserController::class, 'show']);
+        Route::post('/advertisers/{id}/approve',  [AdminAdvertiserController::class, 'approve']);
+        Route::post('/advertisers/{id}/reject',   [AdminAdvertiserController::class, 'reject']);
+        Route::post('/advertisers/{id}/activate', [AdminAdvertiserController::class, 'activate']);
+        Route::post('/advertisers/{id}/pause',    [AdminAdvertiserController::class, 'pause']);
+        Route::post('/advertisers/{id}/resume',   [AdminAdvertiserController::class, 'resume']);
+
+        // Read-only audit log
+        Route::get('/audit-logs', [AdminAuditLogController::class, 'index']);
     });
 });
