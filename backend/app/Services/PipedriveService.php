@@ -168,8 +168,17 @@ class PipedriveService
             return $existing;
         }
 
+        // Spec: paid push falls back contact_name → business_name; abandoned
+        // falls back contact_name → email. This chain covers both: paid
+        // submissions always have business_name (it's required at submission),
+        // so they get business_name; abandoned drafts that haven't entered a
+        // business name yet fall through to email.
+        $name = $advertiser->contact_name
+            ?: $advertiser->business_name
+            ?: $email;
+
         return $this->createPerson([
-            'name'     => $advertiser->contact_name ?: $email,
+            'name'     => $name,
             'email'    => $email,
             'phone'    => $advertiser->contact_phone,
             'org_name' => $advertiser->business_name,
@@ -187,6 +196,10 @@ class PipedriveService
             'currency'   => $data['currency'] ?? config('pipedrive.currency', 'USD'),
             'stage_id'   => $data['stage_id'] ?? null,
             'person_id'  => $data['person_id'] ?? null,
+            // Pipedrive deal statuses: open / won / lost / deleted. We mark
+            // paid deals as 'won' so they leave the active sales pipeline
+            // forecast and land in the closed-won bucket.
+            'status'     => $data['status'] ?? null,
             'expected_close_date' => $data['expected_close_date'] ?? null,
         ], fn ($v) => $v !== null && $v !== '');
 
@@ -224,9 +237,14 @@ class PipedriveService
 
         $personId = $this->findOrCreatePerson($advertiser);
 
-        $business = $advertiser->business_name ?: $advertiser->contact_email ?: 'Untitled lead';
-        $campaign = $advertiser->campaign_name ?: 'No campaign name';
-        $title = $business . ' — ' . $campaign;
+        // Deal title format per spec — emoji prefix + business name.
+        // Paid: "✅ PAID - {biz}". Abandoned: "{biz} - Abandoned Cart".
+        $business = $advertiser->business_name
+            ?: $advertiser->contact_email
+            ?: 'Untitled lead';
+        $title = $stageType === 'paid'
+            ? "✅ PAID - {$business}"
+            : "{$business} - Abandoned Cart";
 
         // Paid deals are worth the actual paid total. Abandoned deals are
         // worth the *potential* monthly budget (no design service add — they
@@ -241,8 +259,28 @@ class PipedriveService
             'currency'  => config('pipedrive.currency', 'USD'),
             'stage_id'  => (int) $stageId,
             'person_id' => $personId,
+            'status'    => $stageType === 'paid' ? 'won' : 'open',
             'expected_close_date' => optional($advertiser->campaign_start_date)->toDateString(),
         ]);
+
+        // Attach a Note with the full advertiser context — covers every
+        // useful field we don't (or can't) map to a standard Pipedrive
+        // column. Non-fatal: a note failure shouldn't undo a successful deal.
+        try {
+            $this->createNote([
+                'deal_id'   => $dealId,
+                'person_id' => $personId,
+                'content'   => $stageType === 'paid'
+                    ? $this->buildPaidNote($advertiser)
+                    : $this->buildAbandonedNote($advertiser),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Pipedrive note attach failed', [
+                'advertiser_id' => $advertiser->id,
+                'deal_id'       => $dealId,
+                'error'         => $e->getMessage(),
+            ]);
+        }
 
         $advertiser->pushed_to_pipedrive = true;
         $advertiser->pipedrive_deal_id = (string) $dealId;
@@ -261,6 +299,120 @@ class PipedriveService
         );
 
         return $dealId;
+    }
+
+    /**
+     * Pipedrive Notes API. Pipedrive renders `content` as HTML.
+     *
+     * @param  array{deal_id?:int,person_id?:int,content:string}  $data
+     */
+    public function createNote(array $data): int
+    {
+        $payload = array_filter([
+            'content'   => $data['content'] ?? '',
+            'deal_id'   => $data['deal_id'] ?? null,
+            'person_id' => $data['person_id'] ?? null,
+        ], fn ($v) => $v !== null && $v !== '');
+
+        $response = Http::timeout(10)
+            ->asJson()
+            ->post($this->url('/notes') . '?api_token=' . urlencode($this->token()), $payload);
+        $this->assertOk($response, '/notes (create)');
+
+        $id = $response->json('data.id');
+        if (!is_numeric($id)) {
+            throw new RuntimeException('Pipedrive returned no note id: ' . $response->body());
+        }
+        return (int) $id;
+    }
+
+    /**
+     * Paid-push note — full submission context. `Advertiser ID` at the end
+     * acts as a dedup key for any future "search notes by advertiser_id"
+     * logic we add.
+     */
+    private function buildPaidNote(Advertiser $a): string
+    {
+        $designService = $a->design_service ? 'Yes ($200)' : 'No';
+        $total = $a->calculateTotal();
+        return $this->renderNote([
+            'Name'                => $a->contact_name,
+            'Email'               => $a->contact_email,
+            'Phone'               => $a->contact_phone,
+            'Company Name'        => $a->business_name,
+            'Website URL'         => $a->website_url,
+            'Campaign Name'       => $a->campaign_name,
+            'Monthly Budget'      => $this->money($a->monthly_budget),
+            'Design Service'      => $designService,
+            'Total Value'         => $this->money($total),
+            'Application Status'  => $this->humanize($a->status?->value),
+            'Payment Status'      => $this->humanize($a->payment_status?->value),
+            'Advertiser ID'       => $a->id,
+        ]);
+    }
+
+    /**
+     * Abandoned-push note — recovery-focused context including a deep-link
+     * back into the wizard so sales can resume the draft on the customer's
+     * behalf, plus a suggested promo code for the recovery email.
+     */
+    private function buildAbandonedNote(Advertiser $a): string
+    {
+        $countries = is_array($a->target_countries)
+            ? implode(', ', $a->target_countries)
+            : ($a->target_countries ?? '');
+
+        $recoveryLink = rtrim((string) config('app.frontend_url'), '/')
+            . '/?return=' . urlencode($a->id)
+            . '&token=' . urlencode($a->access_token);
+
+        return $this->renderNote([
+            'Business Name'    => $a->business_name,
+            'Business Type'    => $this->humanize($a->business_type?->value),
+            'Contact'          => $a->contact_name,
+            'Email'            => $a->contact_email,
+            'Phone'            => $a->contact_phone,
+            'Website'          => $a->website_url,
+            'Campaign Name'    => $a->campaign_name,
+            'Objective'        => $this->humanize($a->campaign_objective?->value),
+            'Monthly Budget'   => $this->money($a->monthly_budget),
+            'Status'           => $this->humanize($a->status?->value),
+            'Countries'        => $countries,
+            'Age Range'        => $a->target_age_range,
+            'Gender'           => $a->target_gender?->value,
+            'Recovery Link'    => $recoveryLink,
+            'Suggested Coupon' => '100OFF',
+            'Advertiser ID'    => $a->id,
+        ]);
+    }
+
+    /**
+     * @param  array<string,mixed>  $fields
+     */
+    private function renderNote(array $fields): string
+    {
+        $lines = [];
+        foreach ($fields as $label => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+            $safeLabel = htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $safeValue = htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $lines[] = "<p><strong>{$safeLabel}:</strong> {$safeValue}</p>";
+        }
+        return implode("\n", $lines);
+    }
+
+    private function money(?float $v): ?string
+    {
+        if ($v === null) return null;
+        return '$' . number_format((float) $v, 2);
+    }
+
+    private function humanize(?string $v): ?string
+    {
+        if ($v === null || $v === '') return null;
+        return ucwords(str_replace('_', ' ', $v));
     }
 
     /**
