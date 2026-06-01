@@ -128,3 +128,17 @@
     @apply font-sans;
   }
 }
+
+/* Trusted-by logo strip — seamless infinite scroll.
+ * Logos are rendered twice in the DOM; translating -50% lands exactly on the
+ * start of the second copy, creating a continuous loop with no jump. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

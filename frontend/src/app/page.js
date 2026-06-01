@@ -10,6 +10,7 @@ import BusinessInfoStep from '@/components/signup/BusinessInfoStep';
 import CampaignSetupStep from '@/components/signup/CampaignSetupStep';
 import ReviewStep from '@/components/signup/ReviewStep';
 import SaveLinkBar from '@/components/signup/SaveLinkBar';
+import HowItWorks from '@/components/signup/HowItWorks';
 import PublicShell from '@/components/layout/PublicShell';
 import BrandLogos from '@/components/layout/BrandLogos';
 import TrustSignals from '@/components/layout/TrustSignals';
@@ -380,7 +381,7 @@ export default function AdvertiserSignupPage() {
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative max-w-4xl mx-auto px-4 py-6 md:py-12">
+      <div className="relative max-w-7xl mx-auto px-4 py-6 md:py-12">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-4 mb-6">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-full">
@@ -439,6 +440,8 @@ export default function AdvertiserSignupPage() {
               ⏱️ Takes less than 3 minutes.
             </p>
 
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+              <div className="lg:col-span-2">
             <Card
               ref={formRef}
               className="p-6 md:p-10 shadow-2xl border-0 bg-white/80 backdrop-blur-sm"
@@ -493,6 +496,12 @@ export default function AdvertiserSignupPage() {
                 </div>
               )}
             </Card>
+              </div>
+
+              <aside className="lg:col-span-1 lg:sticky lg:top-20">
+                <HowItWorks />
+              </aside>
+            </div>
 
             <TrustSignals />
           </div>
