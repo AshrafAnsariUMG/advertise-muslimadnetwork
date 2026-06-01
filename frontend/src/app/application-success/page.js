@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { CheckCircle, Mail, Phone } from 'lucide-react';
+import PublicShell from '@/components/layout/PublicShell';
 
 export default function ApplicationSuccessPage() {
   useEffect(() => {
@@ -31,7 +32,8 @@ export default function ApplicationSuccessPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center px-4 py-12">
+    <PublicShell>
+    <div className="min-h-[80vh] bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center px-4 py-12">
       <div className="max-w-xl w-full text-center space-y-8">
         <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg">
           <CheckCircle className="w-12 h-12 text-white" />
@@ -102,5 +104,6 @@ export default function ApplicationSuccessPage() {
         </div>
       </div>
     </div>
+    </PublicShell>
   );
 }

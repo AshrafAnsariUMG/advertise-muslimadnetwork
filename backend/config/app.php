@@ -55,6 +55,17 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+     * Public-facing URL of the Next.js wizard / customer pages. Used by
+     * Mailables (resume links) and CheckoutController (payment redirects).
+     *
+     * Must be a config binding (not env() called at runtime) because once
+     * `php artisan config:cache` runs, raw env() returns empty in app code
+     * — silently swapping in the backend APP_URL and breaking every email
+     * link. This binding resolves cleanly whether config is cached or not.
+     */
+    'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

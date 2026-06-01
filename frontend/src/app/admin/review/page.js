@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  Download,
   Loader2,
   MoreHorizontal,
   RefreshCcw,
@@ -16,6 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -55,8 +57,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { adminApiCall } from '@/lib/admin-auth';
+import { adminApiCall, adminDownload } from '@/lib/admin-auth';
 import { ApiError } from '@/lib/api';
+import {
+  STATUS_BADGE,
+  STATUS_LABEL,
+  ALLOWED_ACTIONS,
+  ACTION_LABEL,
+} from '@/lib/statuses';
 
 const STATUS_OPTIONS = [
   { value: 'pending_review', label: 'Pending review' },
@@ -74,49 +82,6 @@ const PAYMENT_METHODS = [
   { value: 'stripe', label: 'Stripe' },
   { value: 'paypal', label: 'PayPal' },
 ];
-
-const STATUS_BADGE = {
-  pending_review: 'bg-amber-100 text-amber-800 border-amber-200',
-  approved: 'bg-blue-100 text-blue-800 border-blue-200',
-  active: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  paused: 'bg-slate-200 text-slate-700 border-slate-300',
-  rejected: 'bg-rose-100 text-rose-800 border-rose-200',
-  incomplete_step_1: 'bg-slate-100 text-slate-600 border-slate-200',
-  incomplete_step_2: 'bg-slate-100 text-slate-600 border-slate-200',
-  incomplete_step_3: 'bg-slate-100 text-slate-600 border-slate-200',
-};
-
-const STATUS_LABEL = {
-  pending_review: 'Pending review',
-  approved: 'Approved',
-  active: 'Active',
-  paused: 'Paused',
-  rejected: 'Rejected',
-  incomplete_step_1: 'Step 1',
-  incomplete_step_2: 'Step 2',
-  incomplete_step_3: 'Step 3',
-};
-
-// Allowed transitions per current status. Drives both the row action menu
-// and the detail sheet footer.
-const ALLOWED_ACTIONS = {
-  pending_review: ['approve', 'reject'],
-  approved: ['activate'],
-  active: ['pause'],
-  paused: ['resume'],
-  rejected: [],
-  incomplete_step_1: [],
-  incomplete_step_2: [],
-  incomplete_step_3: [],
-};
-
-const ACTION_LABEL = {
-  approve: 'Approve',
-  reject: 'Reject',
-  activate: 'Activate',
-  pause: 'Pause',
-  resume: 'Resume',
-};
 
 const PER_PAGE = 15;
 const DEBOUNCE_MS = 300;
@@ -182,10 +147,15 @@ export default function AdminReviewPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [auditEntries, setAuditEntries] = useState([]);
 
-  // Reject modal
+  // Reject modal — rejectFor is either an advertiser row, or the sentinel
+  // '__bulk__' when rejecting the current multi-selection.
   const [rejectFor, setRejectFor] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   // Search debounce
   const debounceRef = useRef(null);
@@ -200,9 +170,10 @@ export default function AdminReviewPage() {
     };
   }, [search]);
 
-  // Reset page when filters change
+  // Reset page + clear selection when filters change
   useEffect(() => {
     setPage(1);
+    setSelectedIds(new Set());
   }, [statuses, paymentMethod, fromDate, toDate, sort, direction]);
 
   // Build query string for the list endpoint
@@ -326,13 +297,73 @@ export default function AdminReviewPage() {
     if (!rejectFor || rejectReason.trim().length < 3) return;
     setRejectSubmitting(true);
     try {
-      await runAction(rejectFor.id, 'reject', { reason: rejectReason.trim() });
+      if (rejectFor === '__bulk__') {
+        const result = await adminApiCall(
+          '/api/admin/advertisers/bulk-reject',
+          { method: 'POST', body: { ids: Array.from(selectedIds), reason: rejectReason.trim() } }
+        );
+        toast.success(`Rejected ${result.rejected}, skipped ${result.skipped}.`);
+        setSelectedIds(new Set());
+        await load();
+      } else {
+        await runAction(rejectFor.id, 'reject', { reason: rejectReason.trim() });
+      }
       setRejectFor(null);
       setRejectReason('');
-    } catch {
-      // toast already shown
+    } catch (err) {
+      if (rejectFor === '__bulk__') {
+        toast.error(err?.message || 'Bulk reject failed.');
+      }
+      // single-reject toast already shown by runAction
     } finally {
       setRejectSubmitting(false);
+    }
+  };
+
+  // Bulk approve the current selection
+  const handleBulkApprove = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkSubmitting(true);
+    try {
+      const result = await adminApiCall('/api/admin/advertisers/bulk-approve', {
+        method: 'POST',
+        body: { ids: Array.from(selectedIds) },
+      });
+      toast.success(`Approved ${result.approved}, skipped ${result.skipped}.`);
+      setSelectedIds(new Set());
+      await load();
+    } catch (err) {
+      toast.error(err?.message || 'Bulk approve failed.');
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // Export the current filtered set (not just the page) as CSV
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const qs = new URLSearchParams();
+      if (statuses.length > 0) qs.set('status', statuses.join(','));
+      if (paymentMethod && paymentMethod !== 'all') qs.set('payment_method', paymentMethod);
+      if (debouncedSearch) qs.set('search', debouncedSearch);
+      if (fromDate) qs.set('from_date', fromDate);
+      if (toDate) qs.set('to_date', toDate);
+      const stamp = new Date().toISOString().slice(0, 10);
+      await adminDownload(`/api/admin/advertisers/export?${qs.toString()}`, `advertisers-${stamp}.csv`);
+    } catch (err) {
+      toast.error(err?.message || 'Export failed.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -357,6 +388,28 @@ export default function AdminReviewPage() {
       }
     : null;
 
+  // Only pending_review rows are bulk-actionable (the only status from which
+  // both approve and reject are valid). Select-all applies to those only.
+  const selectableIds = rows
+    .filter((r) => r.status === 'pending_review')
+    .map((r) => r.id);
+  const allSelectableSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+  const someSelectableSelected =
+    selectableIds.some((id) => selectedIds.has(id)) && !allSelectableSelected;
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelectableSelected) {
+        selectableIds.forEach((id) => next.delete(id));
+      } else {
+        selectableIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -366,10 +419,16 @@ export default function AdminReviewPage() {
             Approve, reject, and manage campaign submissions.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={isLoading}>
-          <RefreshCcw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+            <Download className={`w-3.5 h-3.5 mr-1.5 ${exporting ? 'animate-pulse' : ''}`} />
+            Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={load} disabled={isLoading}>
+            <RefreshCcw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -481,6 +540,19 @@ export default function AdminReviewPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-8">
+                      <Checkbox
+                        checked={
+                          allSelectableSelected
+                            ? true
+                            : someSelectableSelected
+                            ? 'indeterminate'
+                            : false
+                        }
+                        onCheckedChange={toggleSelectAll}
+                        disabled={selectableIds.length === 0}
+                      />
+                    </TableHead>
                     <SortableTh column="business_name" sort={sort} direction={direction}>
                       Business
                     </SortableTh>
@@ -505,11 +577,19 @@ export default function AdminReviewPage() {
                       <TableRow
                         key={row.id}
                         className="cursor-pointer"
+                        data-state={selectedIds.has(row.id) ? 'selected' : undefined}
                         onClick={(e) => {
                           if (e.target.closest('[data-row-action]')) return;
                           setOpenSheetId(row.id);
                         }}
                       >
+                        <TableCell data-row-action="true">
+                          <Checkbox
+                            checked={selectedIds.has(row.id)}
+                            onCheckedChange={() => toggleSelected(row.id)}
+                            disabled={row.status !== 'pending_review'}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium text-slate-900">
                           {row.business_name || '—'}
                         </TableCell>
@@ -616,6 +696,47 @@ export default function AdminReviewPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-full shadow-2xl px-5 py-2.5 flex items-center gap-3 z-40">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <span className="h-4 w-px bg-slate-700" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBulkApprove}
+            disabled={bulkSubmitting}
+            className="text-white hover:bg-slate-800 hover:text-white h-8"
+          >
+            {bulkSubmitting ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+            ) : null}
+            Approve selected
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setRejectReason('');
+              setRejectFor('__bulk__');
+            }}
+            disabled={bulkSubmitting}
+            className="text-white hover:bg-slate-800 hover:text-white h-8"
+          >
+            Reject selected
+          </Button>
+          <span className="h-4 w-px bg-slate-700" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-slate-300 hover:bg-slate-800 hover:text-white h-8"
+          >
+            Clear
+          </Button>
+        </div>
+      )}
 
       {/* Detail sheet */}
       <Sheet
@@ -850,10 +971,15 @@ export default function AdminReviewPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reject submission</DialogTitle>
+            <DialogTitle>
+              {rejectFor === '__bulk__'
+                ? `Reject ${selectedIds.size} submission${selectedIds.size === 1 ? '' : 's'}`
+                : 'Reject submission'}
+            </DialogTitle>
             <DialogDescription>
-              The reason is recorded in the audit log and appended to the
-              advertiser&apos;s notes.
+              {rejectFor === '__bulk__'
+                ? 'The same reason is recorded for each. Only pending-review records are affected; others are skipped.'
+                : 'The reason is recorded in the audit log and appended to the advertiser’s notes.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

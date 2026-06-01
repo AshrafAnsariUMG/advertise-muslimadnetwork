@@ -18,24 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { adminApiCall } from '@/lib/admin-auth';
-
-const STATUS_LABELS = {
-  incomplete_step_1: 'Step 1',
-  incomplete_step_2: 'Step 2',
-  incomplete_step_3: 'Step 3 (abandon)',
-  pending_review: 'Pending review',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  active: 'Active',
-  paused: 'Paused',
-};
-
-const PAYMENT_LABELS = {
-  stripe: 'Stripe',
-  paypal: 'PayPal',
-  apple_pay: 'Apple Pay',
-  google_pay: 'Google Pay',
-};
+import { STATUS_LABEL as STATUS_LABELS, PAYMENT_LABELS } from '@/lib/statuses';
 
 const DATE_FMT = new Intl.DateTimeFormat('en-US', {
   month: 'short',

@@ -74,11 +74,9 @@ class PaymentConfirmation extends Mailable implements ShouldQueue
     private function paymentMethodLabel(): string
     {
         return match ($this->advertiser->payment_method) {
-            PaymentMethod::Stripe   => 'Stripe (Card / Bank)',
-            PaymentMethod::PayPal   => 'PayPal',
-            PaymentMethod::ApplePay => 'Apple Pay',
-            PaymentMethod::GooglePay => 'Google Pay',
-            default                  => 'Card',
+            PaymentMethod::Stripe => 'Stripe (Card / Bank)',
+            PaymentMethod::PayPal => 'PayPal',
+            default               => 'Card',
         };
     }
 }

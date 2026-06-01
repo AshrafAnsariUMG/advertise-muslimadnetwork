@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { capturePaypalOrder } from '@/lib/api';
 import { clearDraft, loadDraft } from '@/lib/draft-storage';
+import PublicShell from '@/components/layout/PublicShell';
 
 /**
  * PayPal redirect landing.
@@ -118,10 +119,12 @@ function CapturingFallback() {
 
 export default function PaypalSuccessPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center px-4">
-      <Suspense fallback={<CapturingFallback />}>
-        <PaypalSuccessInner />
-      </Suspense>
-    </div>
+    <PublicShell bare>
+      <div className="min-h-[80vh] bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center px-4 py-16">
+        <Suspense fallback={<CapturingFallback />}>
+          <PaypalSuccessInner />
+        </Suspense>
+      </div>
+    </PublicShell>
   );
 }

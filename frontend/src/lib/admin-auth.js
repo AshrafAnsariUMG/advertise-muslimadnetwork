@@ -117,3 +117,40 @@ export async function adminApiCall(path, options = {}) {
 
   return payload;
 }
+
+/**
+ * Fetch a file (e.g. CSV export) with the admin Bearer token and trigger a
+ * client-side download. Can't use a plain <a download> because that won't
+ * carry the Authorization header.
+ */
+export async function adminDownload(path, filename) {
+  const token = getAdminToken();
+  const url = `${getApiUrl()}${path}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  if (response.status === 401) {
+    clearAdminToken();
+    if (typeof window !== 'undefined') window.location.replace('/admin/login');
+    throw new ApiError({ status: 401, message: 'Session expired.' });
+  }
+  if (!response.ok) {
+    throw new ApiError({
+      status: response.status,
+      message: `Download failed (${response.status})`,
+    });
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = filename || 'export.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(objectUrl);
+}

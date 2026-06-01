@@ -28,6 +28,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import BudgetRecommendation from './BudgetRecommendation';
+import CountryMultiSelect from './CountryMultiSelect';
 
 // Leaflet relies on `window`/`document`, so the picker is loaded only on the
 // client — never during SSR/prerender.
@@ -39,18 +40,6 @@ const LocationPicker = dynamic(() => import('./LocationPicker'), {
     </div>
   ),
 });
-
-const COUNTRIES = [
-  'Global',
-  'North America',
-  'Middle East',
-  'Europe',
-  'Asia',
-  'Africa',
-  'US',
-  'Canada',
-  'UK',
-];
 
 // Pricing constants — must match base44 reference for parity with the live
 // site until cutover.
@@ -88,10 +77,6 @@ function getColorScheme(budget) {
 }
 
 export default function CampaignSetupStep({ formData, updateFormData }) {
-  const [selectedCountries, setSelectedCountries] = useState(
-    formData.target_countries || ['Global']
-  );
-
   // Defaults — only applied on first mount when the field is empty.
   useEffect(() => {
     const updates = {};
@@ -131,14 +116,6 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const toggleCountry = (country) => {
-    const updated = selectedCountries.includes(country)
-      ? selectedCountries.filter((c) => c !== country)
-      : [...selectedCountries, country];
-    setSelectedCountries(updated);
-    updateFormData({ target_countries: updated });
-  };
 
   const calculateMetrics = () => {
     const budget = formData.monthly_budget || 0;
@@ -224,10 +201,8 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
 
   const budgetMin = formData.has_ctv ? 1500 : 250;
   const budgetMax = 10000;
-  const budgetPercentage =
-    (((formData.monthly_budget || 500) - 250) / (budgetMax - 250)) * 100;
 
-  const colors = getColorScheme(formData.monthly_budget || 500);
+  const colors = getColorScheme(Number(formData.monthly_budget) || 500);
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
@@ -343,7 +318,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
           <DollarSign className={`w-5 h-5 ${colors.icon}`} />
           Monthly Budget:{' '}
           <span className="font-bold">
-            ${(formData.monthly_budget || 500).toLocaleString()}
+            ${(Number(formData.monthly_budget) || 500).toLocaleString()}
           </span>{' '}
           USD *
         </Label>
@@ -376,7 +351,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
               className={`relative p-4 rounded-xl border-2 transition-all text-left ${
                 formData.has_ctv ? 'opacity-40 cursor-not-allowed' : ''
               } ${
-                formData.monthly_budget === preset.value
+                Number(formData.monthly_budget) === preset.value
                   ? `${colors.border} ${colors.bg} shadow-md`
                   : 'border-gray-200 hover:border-indigo-300 bg-white'
               }`}
@@ -391,7 +366,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
               )}
               <div
                 className={`font-bold text-xl mb-1 ${
-                  formData.monthly_budget === preset.value
+                  Number(formData.monthly_budget) === preset.value
                     ? colors.text
                     : 'text-indigo-600'
                 }`}
@@ -412,23 +387,25 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
           </p>
         )}
 
-        <div className="relative">
-          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-2 bg-gray-200 rounded-full">
-            <div
-              className={`h-full bg-gradient-to-r ${colors.gradient} rounded-full transition-all duration-300 ease-out`}
-              style={{ width: `${budgetPercentage}%` }}
-            />
-          </div>
+        <div className="py-2">
           <Slider
             id="monthly_budget"
-            value={[formData.monthly_budget || 500]}
-            onValueChange={(value) =>
-              updateFormData({ monthly_budget: value[0] })
-            }
+            value={[Number(formData.monthly_budget) || 500]}
+            onValueChange={(value) => {
+              // base-ui emits a scalar for single-thumb sliders (unlike
+              // Radix, which always emits an array). Handle both shapes and
+              // never write undefined/NaN — doing so would trip the `|| 500`
+              // fallback and snap the thumb back to 500 mid-drag.
+              const next = Array.isArray(value) ? value[0] : value;
+              if (typeof next === 'number' && !Number.isNaN(next)) {
+                updateFormData({ monthly_budget: next });
+              }
+            }}
             min={budgetMin}
             max={budgetMax}
             step={250}
-            className="w-full relative z-10"
+            className="w-full"
+            indicatorClassName={`bg-gradient-to-r ${colors.gradient}`}
           />
         </div>
         <div className="flex justify-between text-sm text-gray-500">
@@ -496,17 +473,22 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                       Reach Muslim households on Smart TVs through top streaming
                       platforms.
                     </p>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-xs font-semibold text-gray-900">
-                        Hulu
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Brand-colored chips — self-contained, no external
+                          logo assets (avoids the base44 CDN dependency). */}
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#1ce783] text-black text-xs font-extrabold tracking-tight">
+                        hulu
                       </span>
-                      <span className="text-xs font-semibold text-gray-900">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-black text-white text-xs font-bold tracking-tight">
                         peacock
                       </span>
-                      <span className="text-xs font-semibold text-purple-700">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#662d91] text-white text-xs font-bold tracking-tight">
                         Roku
                       </span>
-                      <span className="text-xs text-gray-600">and more!</span>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f9a01b] text-black text-xs font-bold tracking-tight">
+                        Sling
+                      </span>
+                      <span className="text-xs text-gray-600">&amp; more</span>
                     </div>
                   </div>
                 </div>
@@ -796,26 +778,12 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
               <Label className="text-gray-900 font-medium">
                 Geographic Targeting *
               </Label>
-              <div className="flex flex-wrap gap-2">
-                {COUNTRIES.map((country) => (
-                  <Badge
-                    key={country}
-                    variant={
-                      selectedCountries.includes(country)
-                        ? 'default'
-                        : 'outline'
-                    }
-                    className={`cursor-pointer transition-all px-4 py-2.5 text-sm ${
-                      selectedCountries.includes(country)
-                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                        : 'hover:border-indigo-300 hover:bg-indigo-50'
-                    }`}
-                    onClick={() => toggleCountry(country)}
-                  >
-                    {country}
-                  </Badge>
-                ))}
-              </div>
+              <CountryMultiSelect
+                value={formData.target_countries || []}
+                onChange={(countries) =>
+                  updateFormData({ target_countries: countries })
+                }
+              />
             </div>
 
             <div className="grid md:grid-cols-2 gap-6 pt-4">

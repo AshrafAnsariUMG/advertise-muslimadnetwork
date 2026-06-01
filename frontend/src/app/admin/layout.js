@@ -84,9 +84,13 @@ function AdminShell({ children }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-500 hidden sm:inline">
+            <a
+              href="/admin/profile"
+              className="text-xs text-slate-500 hover:text-indigo-600 hidden sm:inline transition-colors"
+              title="Profile & password"
+            >
               {user.email}
-            </span>
+            </a>
             <button
               type="button"
               onClick={handleLogout}

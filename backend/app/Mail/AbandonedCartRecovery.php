@@ -49,7 +49,11 @@ class AbandonedCartRecovery extends Mailable implements ShouldQueue
 
     private function buildResumeUrl(): string
     {
-        $frontend = rtrim((string) env('FRONTEND_URL', config('app.url')), '/');
+        // Must use config('app.frontend_url'), NOT env('FRONTEND_URL') —
+        // raw env() returns empty once `php artisan config:cache` has run,
+        // and the URL silently degrades to the backend host. Discovered in
+        // QA after the email body pointed at port 8004 instead of 3004.
+        $frontend = rtrim((string) config('app.frontend_url'), '/');
         $qs = http_build_query([
             'return' => $this->advertiser->id,
             'token'  => $this->advertiser->access_token,

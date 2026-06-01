@@ -21,10 +21,8 @@ use Illuminate\Support\Facades\Log;
 class MattermostNotifier
 {
     private const PAYMENT_LABEL = [
-        'stripe'    => 'Stripe',
-        'paypal'    => 'PayPal',
-        'apple_pay' => 'Apple Pay',
-        'google_pay' => 'Google Pay',
+        'stripe' => 'Stripe',
+        'paypal' => 'PayPal',
     ];
 
     public function notifyNewSubmission(Advertiser $advertiser): void

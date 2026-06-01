@@ -6,10 +6,12 @@ use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreAdvertiserRequest;
 use App\Http\Requests\UpdateAdvertiserRequest;
+use App\Mail\AbandonedCartRecovery;
 use App\Models\Advertiser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Mail;
 
 class AdvertiserController extends Controller
 {
@@ -77,6 +79,38 @@ class AdvertiserController extends Controller
         $advertiser->save();
 
         return response()->json($advertiser);
+    }
+
+    /**
+     * POST /api/v1/advertisers/{id}/email-link?token=...
+     *
+     * User-initiated "email me my resume link so I can finish later." Reuses
+     * the AbandonedCartRecovery mailable (its "your progress is saved,
+     * continue your campaign" copy fits) but deliberately does NOT flip
+     * `recovery_email_sent` — that flag belongs to the automated 24h
+     * abandoned-cart touch, and a proactive save shouldn't suppress it.
+     */
+    public function emailLink(Request $request, string $id): JsonResponse
+    {
+        $advertiser = Advertiser::find($id);
+        if (!$advertiser) {
+            return $this->notFound();
+        }
+
+        if (!$this->tokenMatches($advertiser, $request)) {
+            return $this->forbidden();
+        }
+
+        if (!$advertiser->contact_email) {
+            return response()->json(
+                ['message' => 'Add your email first so we know where to send the link.'],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        Mail::to($advertiser->contact_email)->queue(new AbandonedCartRecovery($advertiser));
+
+        return response()->json(['status' => 'sent']);
     }
 
     private function tokenMatches(Advertiser $advertiser, Request $request): bool

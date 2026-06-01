@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Admin-side CRUD and lifecycle actions on Advertiser records.
@@ -138,13 +139,28 @@ class AdvertiserController extends Controller
 
     public function activate(Request $request, string $id): JsonResponse
     {
-        return $this->transition(
+        $response = $this->transition(
             $request,
             $id,
             from: AdvertiserStatus::Approved,
             to:   AdvertiserStatus::Active,
             action: 'advertiser.activate'
         );
+
+        // On a successful activation, move the Pipedrive deal to the "live"
+        // stage (if one is configured and the advertiser has a deal id).
+        // Fire-and-forget queued job — never blocks the admin response.
+        if ($response->getStatusCode() === Response::HTTP_OK) {
+            $stageActive = config('pipedrive.stage_active');
+            if ($stageActive) {
+                $advertiser = Advertiser::find($id);
+                if ($advertiser && $advertiser->pipedrive_deal_id) {
+                    \App\Jobs\UpdatePipedriveDealStage::dispatch($advertiser, (int) $stageActive);
+                }
+            }
+        }
+
+        return $response;
     }
 
     public function pause(Request $request, string $id): JsonResponse
@@ -233,6 +249,202 @@ class AdvertiserController extends Controller
         $data = $advertiser->toArray();
         unset($data['access_token']);
         return response()->json($data);
+    }
+
+    /**
+     * GET /api/admin/advertisers/export
+     *
+     * Streams a CSV of advertisers matching the same filters as index()
+     * (status / payment_status / payment_method / search / date range), but
+     * unpaginated. Used by the sales team for ad-hoc reporting.
+     *
+     * Auth note: requested via the admin Bearer token (the frontend fetches
+     * it and triggers a client-side blob download), so it goes through the
+     * same auth:sanctum + is-admin gate as the rest of the admin group.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $query = Advertiser::query();
+
+        if ($request->filled('status')) {
+            $statuses = array_filter(array_map('trim', explode(',', (string) $request->query('status'))));
+            $query->whereIn('status', $statuses);
+        }
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', $request->query('payment_status'));
+        }
+        if ($request->filled('payment_method')) {
+            $query->where('payment_method', $request->query('payment_method'));
+        }
+        if ($request->filled('search')) {
+            $needle = '%' . addcslashes((string) $request->query('search'), '%_\\') . '%';
+            $query->where(function ($q) use ($needle) {
+                $q->where('business_name', 'like', $needle)
+                  ->orWhere('contact_email', 'like', $needle)
+                  ->orWhere('contact_name', 'like', $needle);
+            });
+        }
+        if ($request->filled('from_date')) {
+            $query->where('created_at', '>=', $request->query('from_date'));
+        }
+        if ($request->filled('to_date')) {
+            $query->where('created_at', '<=', $request->query('to_date') . ' 23:59:59');
+        }
+        $query->orderByDesc('created_at');
+
+        AuditLogger::log('advertiser.export_csv', null, [
+            'filters' => $request->only(['status', 'payment_status', 'payment_method', 'search', 'from_date', 'to_date']),
+        ], $request);
+
+        $columns = [
+            'id', 'business_name', 'business_type', 'contact_name', 'contact_email',
+            'contact_phone', 'website_url', 'campaign_name', 'campaign_objective',
+            'monthly_budget', 'design_service', 'has_ctv', 'total', 'status',
+            'payment_status', 'payment_method', 'campaign_start_date',
+            'campaign_end_date', 'created_at',
+        ];
+
+        $filename = 'advertisers-' . now()->format('Y-m-d-His') . '.csv';
+
+        return new StreamedResponse(function () use ($query, $columns) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, $columns);
+
+            // chunk() keeps memory flat even at 10k+ rows
+            $query->chunk(500, function ($advertisers) use ($out, $columns) {
+                foreach ($advertisers as $a) {
+                    fputcsv($out, [
+                        $a->id,
+                        $a->business_name,
+                        $a->business_type?->value,
+                        $a->contact_name,
+                        $a->contact_email,
+                        $a->contact_phone,
+                        $a->website_url,
+                        $a->campaign_name,
+                        $a->campaign_objective?->value,
+                        $a->monthly_budget,
+                        $a->design_service ? 'yes' : 'no',
+                        $a->has_ctv ? 'yes' : 'no',
+                        round($a->calculateTotal(), 2),
+                        $a->status?->value,
+                        $a->payment_status?->value,
+                        $a->payment_method?->value,
+                        optional($a->campaign_start_date)->toDateString(),
+                        optional($a->campaign_end_date)->toDateString(),
+                        optional($a->created_at)->toIso8601String(),
+                    ]);
+                }
+            });
+
+            fclose($out);
+        }, 200, [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    /**
+     * POST /api/admin/advertisers/bulk-approve
+     * Body: { ids: [uuid...] } — max 100. Only pending_review rows transition;
+     * others are skipped (not an error). Returns { approved, skipped, total }.
+     */
+    public function bulkApprove(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids'   => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['uuid'],
+        ]);
+
+        $user = $request->user();
+        $advertisers = Advertiser::whereIn('id', $validated['ids'])->get();
+
+        $approved = 0;
+        $skipped = 0;
+        foreach ($advertisers as $advertiser) {
+            if ($advertiser->status !== AdvertiserStatus::PendingReview) {
+                $skipped++;
+                continue;
+            }
+            $before = ['status' => $advertiser->status->value, 'notes' => $advertiser->notes];
+            $advertiser->status = AdvertiserStatus::Approved;
+            $line = 'Approved (bulk) by ' . $user->email . ' on ' . now()->toDateTimeString();
+            $advertiser->notes = $advertiser->notes ? $advertiser->notes . "\n" . $line : $line;
+            $advertiser->save();
+
+            AuditLogger::log(
+                action: 'advertiser.approve',
+                target: $advertiser,
+                changes: ['before' => $before, 'after' => ['status' => 'approved', 'notes' => $advertiser->notes], 'bulk' => true],
+                request: $request
+            );
+            $approved++;
+        }
+
+        // Bulk-level summary row so the audit trail shows the operation itself.
+        AuditLogger::log(
+            action: 'advertiser.bulk_approve',
+            target: null,
+            changes: ['approved' => $approved, 'skipped' => $skipped, 'total' => count($validated['ids']), 'ids' => $validated['ids']],
+            request: $request
+        );
+
+        return response()->json([
+            'approved' => $approved,
+            'skipped'  => $skipped,
+            'total'    => count($validated['ids']),
+        ]);
+    }
+
+    /**
+     * POST /api/admin/advertisers/bulk-reject
+     * Body: { ids: [uuid...], reason: string } — max 100.
+     */
+    public function bulkReject(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids'    => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*'  => ['uuid'],
+            'reason' => ['required', 'string', 'min:3', 'max:2000'],
+        ]);
+
+        $user = $request->user();
+        $advertisers = Advertiser::whereIn('id', $validated['ids'])->get();
+
+        $rejected = 0;
+        $skipped = 0;
+        foreach ($advertisers as $advertiser) {
+            if ($advertiser->status !== AdvertiserStatus::PendingReview) {
+                $skipped++;
+                continue;
+            }
+            $before = ['status' => $advertiser->status->value, 'notes' => $advertiser->notes];
+            $advertiser->status = AdvertiserStatus::Rejected;
+            $line = 'Rejected (bulk) by ' . $user->email . ' on ' . now()->toDateTimeString() . ': ' . $validated['reason'];
+            $advertiser->notes = $advertiser->notes ? $advertiser->notes . "\n" . $line : $line;
+            $advertiser->save();
+
+            AuditLogger::log(
+                action: 'advertiser.reject',
+                target: $advertiser,
+                changes: ['before' => $before, 'after' => ['status' => 'rejected', 'notes' => $advertiser->notes], 'reason' => $validated['reason'], 'bulk' => true],
+                request: $request
+            );
+            $rejected++;
+        }
+
+        AuditLogger::log(
+            action: 'advertiser.bulk_reject',
+            target: null,
+            changes: ['rejected' => $rejected, 'skipped' => $skipped, 'total' => count($validated['ids']), 'reason' => $validated['reason'], 'ids' => $validated['ids']],
+            request: $request
+        );
+
+        return response()->json([
+            'rejected' => $rejected,
+            'skipped'  => $skipped,
+            'total'    => count($validated['ids']),
+        ]);
     }
 
     /**

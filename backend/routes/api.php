@@ -26,6 +26,7 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware('throttle:advertiser-write')->group(function () {
         Route::patch('/advertisers/{id}', [AdvertiserController::class, 'update']);
+        Route::post('/advertisers/{id}/email-link', [AdvertiserController::class, 'emailLink']);
     });
 
     Route::middleware('throttle:uploads')->group(function () {
@@ -65,11 +66,15 @@ Route::prefix('admin')->group(function () {
     Route::middleware(['auth:sanctum', 'is-admin'])->group(function () {
         Route::post('/auth/logout', [AdminAuthController::class, 'logout']);
         Route::get('/auth/me',     [AdminAuthController::class, 'me']);
+        Route::post('/auth/change-password', [AdminAuthController::class, 'changePassword']);
 
         Route::get('/dashboard/metrics', [AdminDashboardController::class, 'metrics']);
 
         // Advertiser admin CRUD + lifecycle
         Route::get('/advertisers',          [AdminAdvertiserController::class, 'index']);
+        Route::get('/advertisers/export',   [AdminAdvertiserController::class, 'export']);
+        Route::post('/advertisers/bulk-approve', [AdminAdvertiserController::class, 'bulkApprove']);
+        Route::post('/advertisers/bulk-reject',  [AdminAdvertiserController::class, 'bulkReject']);
         Route::get('/advertisers/{id}',     [AdminAdvertiserController::class, 'show']);
         Route::post('/advertisers/{id}/approve',  [AdminAdvertiserController::class, 'approve']);
         Route::post('/advertisers/{id}/reject',   [AdminAdvertiserController::class, 'reject']);

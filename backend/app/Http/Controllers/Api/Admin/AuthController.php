@@ -112,4 +112,42 @@ class AuthController extends Controller
             'role'  => $user->role?->value,
         ]);
     }
+
+    /**
+     * POST /api/admin/auth/change-password
+     *
+     * Self-service password change for the logged-in admin. Verifies the
+     * current password, sets the new one, and revokes all OTHER tokens
+     * (keeping the current session alive). Closes the S9 gap where the only
+     * way to rotate the password was DELETE-row + reseed.
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password'     => ['required', 'string', 'min:12', 'confirmed'],
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            AuditLogger::log('auth.password_change.failed', $user, null, $request);
+            return response()->json(
+                ['message' => 'Current password is incorrect.'],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        $user->password = Hash::make($validated['new_password']);
+        $user->save();
+
+        // Revoke every token except the one making this request, so a leaked
+        // old session can't survive a password change.
+        $currentId = $user->currentAccessToken()->id;
+        $user->tokens()->where('id', '!=', $currentId)->delete();
+
+        AuditLogger::log('auth.password_change.success', $user, null, $request);
+
+        return response()->json(['status' => 'updated']);
+    }
 }

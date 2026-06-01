@@ -124,7 +124,13 @@ export default function LocationPicker({ location, onLocationChange }) {
           <Label>Target Radius: {radius} miles</Label>
           <Slider
             value={[radius]}
-            onValueChange={(value) => setRadius(value[0])}
+            onValueChange={(value) => {
+              // base-ui emits a scalar for single-thumb sliders; handle both.
+              const next = Array.isArray(value) ? value[0] : value;
+              if (typeof next === 'number' && !Number.isNaN(next)) {
+                setRadius(next);
+              }
+            }}
             min={1}
             max={50}
             step={1}

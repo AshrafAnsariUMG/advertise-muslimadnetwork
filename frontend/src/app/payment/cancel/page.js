@@ -1,10 +1,12 @@
 'use client';
 
 import { ChevronLeft, ShieldCheck } from 'lucide-react';
+import PublicShell from '@/components/layout/PublicShell';
 
 export default function PaymentCancelPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center px-4">
+    <PublicShell>
+    <div className="min-h-[80vh] bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center px-4 py-16">
       <div className="max-w-md w-full text-center space-y-6">
         <div className="w-16 h-16 mx-auto rounded-full bg-gray-100 flex items-center justify-center">
           <ShieldCheck className="w-10 h-10 text-gray-600" />
@@ -39,5 +41,6 @@ export default function PaymentCancelPage() {
         </p>
       </div>
     </div>
+    </PublicShell>
   );
 }

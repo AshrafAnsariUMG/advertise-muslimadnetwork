@@ -91,6 +91,17 @@ export function getAdvertiser(id, token) {
 }
 
 /**
+ * Emails the draft's resume link to its contact_email so the user can finish
+ * on another device / later. Does not affect the abandoned-cart flag.
+ */
+export function emailDraftLink(id, token) {
+  const qs = new URLSearchParams({ token }).toString();
+  return request(`/api/v1/advertisers/${encodeURIComponent(id)}/email-link?${qs}`, {
+    method: 'POST',
+  });
+}
+
+/**
  * Kicks off Stripe Checkout. Returns `{ url }` — the caller should
  * `window.location.href = url` to send the user into the Stripe-hosted page.
  * Backend creates the session, stores the session id on the advertiser, and

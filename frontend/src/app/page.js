@@ -9,6 +9,10 @@ import StepProgress from '@/components/signup/StepProgress';
 import BusinessInfoStep from '@/components/signup/BusinessInfoStep';
 import CampaignSetupStep from '@/components/signup/CampaignSetupStep';
 import ReviewStep from '@/components/signup/ReviewStep';
+import SaveLinkBar from '@/components/signup/SaveLinkBar';
+import PublicShell from '@/components/layout/PublicShell';
+import BrandLogos from '@/components/layout/BrandLogos';
+import TrustSignals from '@/components/layout/TrustSignals';
 import {
   createAdvertiser,
   updateAdvertiser,
@@ -369,7 +373,8 @@ export default function AdvertiserSignupPage() {
   })();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 relative">
+    <PublicShell>
+    <div className="bg-gradient-to-br from-slate-50 via-white to-indigo-50 relative">
       <div className="absolute inset-0 opacity-5 pointer-events-none">
         <div className="bg-indigo-500 absolute top-0 left-0 w-64 h-64 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl" />
@@ -419,6 +424,8 @@ export default function AdvertiserSignupPage() {
           </p>
         </div>
 
+        <BrandLogos />
+
         {isLoading ? (
           <div className="flex justify-center py-20">
             <div className="text-center">
@@ -445,6 +452,14 @@ export default function AdvertiserSignupPage() {
               )}
 
               <div className="min-h-96">{renderStep()}</div>
+
+              {currentStep === 0 && (
+                <SaveLinkBar
+                  advertiserId={advertiserId}
+                  accessToken={accessToken}
+                  hasEmail={!!formData.contact_email}
+                />
+              )}
 
               {currentStep < STEPS.length - 1 && (
                 <div className="flex justify-between mt-10 pt-6 border-t border-gray-100">
@@ -478,9 +493,12 @@ export default function AdvertiserSignupPage() {
                 </div>
               )}
             </Card>
+
+            <TrustSignals />
           </div>
         )}
       </div>
     </div>
+    </PublicShell>
   );
 }

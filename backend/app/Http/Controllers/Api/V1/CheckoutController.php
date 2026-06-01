@@ -230,8 +230,12 @@ class CheckoutController extends Controller
                 'brand_name'          => 'Muslim Ad Network',
                 'user_action'         => 'PAY_NOW',
                 'shipping_preference' => 'NO_SHIPPING',
-                'return_url'          => rtrim((string) env('FRONTEND_URL', ''), '/') . '/payment/paypal-success',
-                'cancel_url'          => rtrim((string) env('FRONTEND_URL', ''), '/') . '/payment/cancel?advertiser_id=' . $advertiser->id,
+                // Bound through config to survive `artisan config:cache`.
+                // Raw env() would return empty once config is cached, and
+                // PayPal would receive `/payment/paypal-success` as a
+                // protocol-relative path → checkout request rejected.
+                'return_url'          => rtrim((string) config('app.frontend_url'), '/') . '/payment/paypal-success',
+                'cancel_url'          => rtrim((string) config('app.frontend_url'), '/') . '/payment/cancel?advertiser_id=' . $advertiser->id,
             ],
         ];
 

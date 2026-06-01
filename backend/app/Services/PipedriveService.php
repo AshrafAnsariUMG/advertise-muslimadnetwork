@@ -245,6 +245,8 @@ class PipedriveService
         ]);
 
         $advertiser->pushed_to_pipedrive = true;
+        $advertiser->pipedrive_deal_id = (string) $dealId;
+        $advertiser->pipedrive_pushed_at = now();
         $advertiser->save();
 
         AuditLogger::log(
@@ -259,6 +261,36 @@ class PipedriveService
         );
 
         return $dealId;
+    }
+
+    /**
+     * Move an existing deal to a new stage. Used when an advertiser is
+     * activated (paid → live). No-op (returns false) if the advertiser has
+     * no stored deal id or the target stage isn't configured — both are
+     * acceptable "nothing to do" states, not errors.
+     */
+    public function updateDealStage(Advertiser $advertiser, int $stageId): bool
+    {
+        $dealId = $advertiser->pipedrive_deal_id;
+        if (!$dealId) {
+            return false;
+        }
+
+        $response = Http::timeout(10)
+            ->asJson()
+            ->put(
+                $this->url('/deals/' . $dealId) . '?api_token=' . urlencode($this->token()),
+                ['stage_id' => $stageId]
+            );
+        $this->assertOk($response, '/deals (stage update)');
+
+        AuditLogger::log(
+            action: 'pipedrive.update_stage',
+            target: $advertiser,
+            changes: ['pipedrive_deal_id' => $dealId, 'stage_id' => $stageId]
+        );
+
+        return true;
     }
 
     private function assertOk(HttpResponse $response, string $context): void

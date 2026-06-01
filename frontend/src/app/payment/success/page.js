@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { getAdvertiser, ApiError } from '@/lib/api';
 import { loadDraft, clearDraft } from '@/lib/draft-storage';
+import PublicShell from '@/components/layout/PublicShell';
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_ATTEMPTS = 15; // 30 seconds total
@@ -139,10 +140,12 @@ function PollingFallback() {
 
 export default function PaymentSuccessPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center px-4">
-      <Suspense fallback={<PollingFallback />}>
-        <PaymentSuccessInner />
-      </Suspense>
-    </div>
+    <PublicShell bare>
+      <div className="min-h-[80vh] bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center px-4 py-16">
+        <Suspense fallback={<PollingFallback />}>
+          <PaymentSuccessInner />
+        </Suspense>
+      </div>
+    </PublicShell>
   );
 }

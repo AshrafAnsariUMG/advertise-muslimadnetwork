@@ -59,24 +59,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { adminApiCall } from '@/lib/admin-auth';
+import {
+  STATUS_BADGE as STAGE_BADGE,
+  STATUS_LABEL as STAGE_LABEL,
+} from '@/lib/statuses';
 
 const STAGE_OPTIONS = [
   { value: 'incomplete_step_1', label: 'Step 1 (business)' },
   { value: 'incomplete_step_2', label: 'Step 2 (campaign)' },
   { value: 'incomplete_step_3', label: 'Step 3 (review)' },
 ];
-
-const STAGE_BADGE = {
-  incomplete_step_1: 'bg-slate-100 text-slate-700 border-slate-200',
-  incomplete_step_2: 'bg-blue-100 text-blue-800 border-blue-200',
-  incomplete_step_3: 'bg-amber-100 text-amber-800 border-amber-200',
-};
-
-const STAGE_LABEL = {
-  incomplete_step_1: 'Step 1',
-  incomplete_step_2: 'Step 2',
-  incomplete_step_3: 'Step 3',
-};
 
 const AGE_OPTIONS = [
   { value: 1, label: '> 1 hour' },

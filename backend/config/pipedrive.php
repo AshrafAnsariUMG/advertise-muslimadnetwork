@@ -31,5 +31,10 @@ return [
     'stage_paid'      => env('PIPEDRIVE_STAGE_PAID') !== null && env('PIPEDRIVE_STAGE_PAID') !== ''
         ? (int) env('PIPEDRIVE_STAGE_PAID')
         : null,
+    // Stage a deal moves to once the campaign is approved + activated. If
+    // unset, the deal stage simply isn't updated on activate (non-fatal).
+    'stage_active'    => env('PIPEDRIVE_STAGE_ACTIVE') !== null && env('PIPEDRIVE_STAGE_ACTIVE') !== ''
+        ? (int) env('PIPEDRIVE_STAGE_ACTIVE')
+        : null,
     'currency'        => strtoupper((string) env('PIPEDRIVE_CURRENCY', 'USD')),
 ];
