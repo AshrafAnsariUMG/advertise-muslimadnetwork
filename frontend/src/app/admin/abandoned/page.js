@@ -70,11 +70,15 @@ const STAGE_OPTIONS = [
   { value: 'incomplete_step_3', label: 'Step 3 (review)' },
 ];
 
+// Inactivity thresholds in MINUTES. 5min default — short enough to feel
+// real-time, long enough that actively-typing users (1s auto-save) don't
+// flicker into the list.
 const AGE_OPTIONS = [
-  { value: 1, label: '> 1 hour' },
-  { value: 24, label: '> 24 hours' },
-  { value: 48, label: '> 48 hours' },
-  { value: 168, label: '> 7 days' },
+  { value: 5, label: '> 5 min (recently abandoned)' },
+  { value: 60, label: '> 1 hour' },
+  { value: 1440, label: '> 24 hours' },
+  { value: 2880, label: '> 48 hours' },
+  { value: 10080, label: '> 7 days' },
 ];
 
 const PER_PAGE = 15;
@@ -93,8 +97,11 @@ function fmtMoney(v) {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
-function fmtAge(hours) {
-  if (hours == null) return '—';
+function fmtInactive(minutes) {
+  if (minutes == null) return '—';
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
 }
@@ -133,7 +140,7 @@ export default function AdminAbandonedPage() {
     'incomplete_step_2',
     'incomplete_step_3',
   ]);
-  const [minAge, setMinAge] = useState(24);
+  const [minAge, setMinAge] = useState(5); // minutes — see AGE_OPTIONS
   const [hasEmail, setHasEmail] = useState(true);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -176,7 +183,7 @@ export default function AdminAbandonedPage() {
   const queryString = useMemo(() => {
     const qs = new URLSearchParams();
     if (stages.length > 0) qs.set('stage', stages.join(','));
-    qs.set('min_age_hours', String(minAge));
+    qs.set('min_age_minutes', String(minAge));
     qs.set('has_email', hasEmail ? 'true' : 'false');
     if (debouncedSearch) qs.set('search', debouncedSearch);
     qs.set('sort', sort);
@@ -522,7 +529,7 @@ export default function AdminAbandonedPage() {
                     <TableHead>Contact</TableHead>
                     <TableHead>Campaign</TableHead>
                     <TableHead>Step</TableHead>
-                    <TableHead>Age</TableHead>
+                    <TableHead>Inactive for</TableHead>
                     <TableHead>Potential</TableHead>
                     <TableHead className="text-center">Emailed</TableHead>
                     <TableHead className="text-center">Pipedrive</TableHead>
@@ -566,7 +573,7 @@ export default function AdminAbandonedPage() {
                           <StageBadge stage={row.status} />
                         </TableCell>
                         <TableCell className="text-slate-500 text-xs">
-                          {fmtAge(row.age_hours)}
+                          {fmtInactive(row.inactive_minutes)}
                         </TableCell>
                         <TableCell className="font-medium">
                           {row.potential_total != null ? fmtMoney(row.potential_total) : '—'}
@@ -709,7 +716,7 @@ export default function AdminAbandonedPage() {
               <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                 <StageBadge stage={detailRow.status} />
                 <span>·</span>
-                <span>{fmtAge(detailRow.age_hours)} old</span>
+                <span>inactive {fmtInactive(detailRow.inactive_minutes)}</span>
                 <span>·</span>
                 <span>{fmtDate(detailRow.created_at)}</span>
               </div>

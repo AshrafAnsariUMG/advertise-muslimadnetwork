@@ -99,9 +99,14 @@ class AdvertiserController extends Controller
         unset($data['access_token']);
 
         $data['computed'] = [
-            'total'         => round($advertiser->calculateTotal(), 2),
-            'abandoned_age_hours' => $advertiser->created_at
-                ? max(0, (int) $advertiser->created_at->diffInHours(now()))
+            'total'             => round($advertiser->calculateTotal(), 2),
+            // Inactivity since the user's last interaction (auto-save).
+            'inactive_minutes'  => $advertiser->updated_at
+                ? max(0, (int) $advertiser->updated_at->diffInMinutes(now()))
+                : null,
+            // Kept for back-compat with anything reading the old field.
+            'abandoned_age_hours' => $advertiser->updated_at
+                ? max(0, (int) $advertiser->updated_at->diffInHours(now()))
                 : null,
         ];
 

@@ -18,9 +18,10 @@ use Illuminate\Support\Facades\Mail;
 /**
  * Admin endpoints for the abandoned-carts workflow.
  *
- * "Abandoned" here means an Advertiser in any `incomplete_step_*` status,
- * older than min_age_hours, with a contact_email (so we can actually
- * recover them).
+ * "Abandoned" here means an Advertiser in any `incomplete_step_*` status
+ * whose last activity (`updated_at`) is older than min_age_minutes (default
+ * 5 — short enough to feel real-time, long enough that actively-typing
+ * users don't appear), with a contact_email so we can recover them.
  *
  * Two recovery levers:
  *  - Recovery email (queued AbandonedCartRecovery mailable)
@@ -54,13 +55,17 @@ class AbandonedController extends Controller
     public function index(Request $request): JsonResponse
     {
         $stages = $this->parseStages($request);
-        $minAgeHours = (int) $request->query('min_age_hours', 24);
+        // Minimum inactivity window — default 5 minutes since the user's last
+        // save. We filter on `updated_at` (last activity), not `created_at`,
+        // so an actively-typing user (auto-save fires every 1s) never appears
+        // here. The moment they stop interacting for 5 min, they show up.
+        $minAgeMinutes = (int) $request->query('min_age_minutes', 5);
         $hasEmail = filter_var($request->query('has_email', 'true'), FILTER_VALIDATE_BOOLEAN);
-        $cutoff = now()->subHours(max(0, $minAgeHours));
+        $cutoff = now()->subMinutes(max(0, $minAgeMinutes));
 
         $query = Advertiser::query()
             ->whereIn('status', $stages)
-            ->where('created_at', '<', $cutoff);
+            ->where('updated_at', '<', $cutoff);
 
         if ($hasEmail) {
             $query->whereNotNull('contact_email')->where('contact_email', '!=', '');
@@ -322,8 +327,10 @@ class AbandonedController extends Controller
      */
     private function rowShape(Advertiser $a): array
     {
-        $ageHours = $a->created_at
-            ? max(0, (int) $a->created_at->diffInHours(now()))
+        // Inactivity = time since last save. Granular minutes — the frontend
+        // formats it as "Xm" / "Xh" / "Xd" depending on magnitude.
+        $inactiveMinutes = $a->updated_at
+            ? max(0, (int) $a->updated_at->diffInMinutes(now()))
             : null;
 
         return [
@@ -336,7 +343,7 @@ class AbandonedController extends Controller
             'monthly_budget'             => $a->monthly_budget,
             'design_service'             => (bool) $a->design_service,
             'status'                     => $a->status?->value,
-            'age_hours'                  => $ageHours,
+            'inactive_minutes'           => $inactiveMinutes,
             'recovery_email_sent'        => (bool) $a->recovery_email_sent,
             'recovery_email_sent_date'   => optional($a->recovery_email_sent_date)->toIso8601String(),
             'pushed_to_pipedrive'        => (bool) $a->pushed_to_pipedrive,
@@ -344,6 +351,7 @@ class AbandonedController extends Controller
                 ? round($a->calculateTotal(), 2)
                 : null,
             'created_at'                 => optional($a->created_at)->toIso8601String(),
+            'last_activity_at'           => optional($a->updated_at)->toIso8601String(),
         ];
     }
 
@@ -355,7 +363,7 @@ class AbandonedController extends Controller
     {
         $base = Advertiser::query()
             ->whereIn('status', $stages)
-            ->where('created_at', '<', $cutoff);
+            ->where('updated_at', '<', $cutoff);
 
         if ($hasEmail) {
             $base->whereNotNull('contact_email')->where('contact_email', '!=', '');
