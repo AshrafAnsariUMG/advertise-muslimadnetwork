@@ -1,6 +1,9 @@
 # Reference source (not committed)
 _base44-reference/
 
+# Local-only scratch / screenshots used during agent sessions
+tempImages/
+
 # Environment files
 backend/.env
 backend/.env.*
