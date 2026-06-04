@@ -19,6 +19,9 @@ return [
      * production HTTPS host across S1–S12 — keep these URL builders dynamic
      * so the cutover does not need a Stripe config change.
      */
-    'success_url' => rtrim((string) env('FRONTEND_URL', ''), '/') . '/payment/success',
+    // {CHECKOUT_SESSION_ID} is substituted by Stripe on redirect — the
+    // success page uses it to verify the session (return-path fulfillment,
+    // belt-and-suspenders alongside the webhook).
+    'success_url' => rtrim((string) env('FRONTEND_URL', ''), '/') . '/payment/success?session_id={CHECKOUT_SESSION_ID}',
     'cancel_url'  => rtrim((string) env('FRONTEND_URL', ''), '/') . '/payment/cancel',
 ];

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle, Loader2 } from 'lucide-react';
-import { getAdvertiser, ApiError } from '@/lib/api';
+import { getAdvertiser, verifyStripeCheckout, ApiError } from '@/lib/api';
 import { loadDraft, clearDraft } from '@/lib/draft-storage';
 import PublicShell from '@/components/layout/PublicShell';
 
@@ -44,6 +44,17 @@ function PaymentSuccessInner() {
       if (cancelled) return;
       attemptsRef.current += 1;
 
+      // First attempt: nudge server-side return-path verification. This
+      // fulfills the order even if the Stripe webhook never reaches us
+      // (e.g. on the plain-HTTP staging box). Idempotent + safe.
+      if (attemptsRef.current === 1 && sessionId) {
+        try {
+          await verifyStripeCheckout(draft.id, draft.token, sessionId);
+        } catch {
+          // ignore — fall back to polling (webhook may still fulfill)
+        }
+      }
+
       try {
         const record = await getAdvertiser(draft.id, draft.token);
         if (record?.payment_status === 'paid') {
@@ -82,7 +93,7 @@ function PaymentSuccessInner() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [router]);
+  }, [router, sessionId]);
 
   return (
     <div className="max-w-md w-full text-center space-y-6">

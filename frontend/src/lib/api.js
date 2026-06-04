@@ -118,6 +118,22 @@ export function createStripeCheckout(advertiserId, accessToken) {
 }
 
 /**
+ * Return-path verification: retrieve the Stripe Checkout Session and fulfill
+ * if paid. Idempotent — safe to call alongside the webhook. Returns
+ * `{ status: 'paid' | 'pending' }`.
+ */
+export function verifyStripeCheckout(advertiserId, accessToken, sessionId) {
+  return request('/api/v1/checkout/stripe/verify', {
+    method: 'POST',
+    body: {
+      advertiser_id: advertiserId,
+      access_token: accessToken,
+      session_id: sessionId,
+    },
+  });
+}
+
+/**
  * Creates a PayPal Order. Returns `{ order_id, approval_url }`. Send the
  * user to `approval_url` to approve the payment on PayPal's domain. PayPal
  * then redirects back to /payment/paypal-success which calls

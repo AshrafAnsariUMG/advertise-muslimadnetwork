@@ -63,14 +63,11 @@ class CheckoutController extends Controller
             );
         }
 
-        // Submission readiness — same gate as PATCH→pending_review
+        // Submission readiness — same gate as PATCH→pending_review.
+        // NOTE: no creative/design check here anymore — creatives are
+        // collected AFTER payment (on the success page), so checkout only
+        // needs the campaign fields to be complete.
         $gateErrors = (new AdvertiserSubmissionGate())->errorsForAdvertiser($advertiser);
-
-        // Plus: at least one creative or design service selected
-        $hasCreatives = is_array($advertiser->ad_creatives) && count($advertiser->ad_creatives) > 0;
-        if (!$hasCreatives && !$advertiser->design_service) {
-            $gateErrors['ad_creatives'] = 'Please upload at least one ad creative or enable the design service.';
-        }
 
         if (!empty($gateErrors)) {
             return response()->json([
@@ -116,6 +113,77 @@ class CheckoutController extends Controller
         return response()->json([
             'url' => $session->url,
         ]);
+    }
+
+    /**
+     * POST /api/v1/checkout/stripe/verify
+     *
+     * Return-path confirmation. The webhook is the canonical fulfillment path,
+     * but on staging (no public HTTPS webhook) — and as belt-and-suspenders in
+     * production — the success page calls this with the Checkout Session id.
+     * We retrieve the session from Stripe, and if it's paid, mark the
+     * advertiser paid + fire fulfillment. Idempotent: a no-op if already paid
+     * (so it never double-fulfills alongside the webhook).
+     *
+     * Body: { advertiser_id, access_token, session_id }
+     * → { status: 'paid' | 'pending' }
+     */
+    public function verify(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'advertiser_id' => ['required', 'uuid'],
+            'access_token'  => ['required', 'string', 'size:64'],
+            'session_id'    => ['required', 'string'],
+        ]);
+
+        $advertiser = Advertiser::find($validated['advertiser_id']);
+        if (!$advertiser) {
+            return response()->json(['message' => 'Advertiser not found.'], Response::HTTP_NOT_FOUND);
+        }
+        if (!hash_equals($advertiser->access_token, $validated['access_token'])) {
+            return response()->json(['message' => 'Invalid access token.'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Already fulfilled (e.g. the webhook beat us here) → no-op.
+        if ($advertiser->payment_status === PaymentStatus::Paid) {
+            return response()->json(['status' => 'paid']);
+        }
+
+        $secret = config('stripe.secret_key');
+        if (empty($secret)) {
+            return response()->json(['status' => 'pending']);
+        }
+
+        try {
+            $stripe = new StripeClient($secret);
+            $session = $stripe->checkout->sessions->retrieve($validated['session_id'], []);
+        } catch (ApiErrorException $e) {
+            Log::warning('Stripe verify: session retrieve failed', [
+                'advertiser_id' => $advertiser->id,
+                'message'       => $e->getMessage(),
+            ]);
+            return response()->json(['status' => 'pending']);
+        }
+
+        // The session must belong to THIS advertiser and be paid.
+        $sessionAdvertiserId = $session->metadata->advertiser_id ?? null;
+        if ($sessionAdvertiserId !== $advertiser->id || $session->payment_status !== 'paid') {
+            return response()->json(['status' => 'pending']);
+        }
+
+        $advertiser->payment_status = PaymentStatus::Paid;
+        $advertiser->payment_method = PaymentMethod::Stripe;
+        $advertiser->stripe_payment_intent = (string) ($session->payment_intent ?? '');
+        $advertiser->status = AdvertiserStatus::PendingReview;
+        $advertiser->save();
+
+        Log::info('Stripe verify: advertiser marked paid via return path', [
+            'advertiser_id' => $advertiser->id,
+        ]);
+
+        WebhookController::fireSubmissionFulfillment($advertiser);
+
+        return response()->json(['status' => 'paid']);
     }
 
     /**
