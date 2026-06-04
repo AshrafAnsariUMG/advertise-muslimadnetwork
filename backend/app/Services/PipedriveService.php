@@ -128,7 +128,12 @@ class PipedriveService
     /**
      * Create a Pipedrive Person. Returns the new person ID.
      *
-     * @param  array<string,mixed>  $data  expects keys: name, email, phone, org_name (any may be null/missing)
+     * @param  array<string,mixed>  $data  expects keys: name, email, phone (any may be null/missing)
+     *
+     * Note: the v1 /persons endpoint does NOT accept `org_name` (returns 400
+     * ERR_SCHEMA_VALIDATION_FAILED). Linking an org requires a separate Orgs
+     * call + `org_id`. Per spec we don't create orgs — the company name lives
+     * in the attached deal Note instead.
      */
     public function createPerson(array $data): int
     {
@@ -136,7 +141,6 @@ class PipedriveService
             'name'  => $data['name'] ?? null,
             'email' => isset($data['email']) ? [$data['email']] : null,
             'phone' => isset($data['phone']) ? [$data['phone']] : null,
-            'org_name' => $data['org_name'] ?? null,
         ], fn ($v) => $v !== null && $v !== '');
 
         $response = Http::timeout(10)
@@ -178,10 +182,9 @@ class PipedriveService
             ?: $email;
 
         return $this->createPerson([
-            'name'     => $name,
-            'email'    => $email,
-            'phone'    => $advertiser->contact_phone,
-            'org_name' => $advertiser->business_name,
+            'name'  => $name,
+            'email' => $email,
+            'phone' => $advertiser->contact_phone,
         ]);
     }
 
