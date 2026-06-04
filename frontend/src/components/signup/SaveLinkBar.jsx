@@ -29,13 +29,41 @@ export default function SaveLinkBar({ advertiserId, accessToken, hasEmail }) {
       : '';
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(resumeUrl);
+    const markCopied = () => {
       setCopied(true);
       toast.success('Link copied — paste it anywhere to continue later.');
       setTimeout(() => setCopied(false), 2500);
+    };
+
+    // navigator.clipboard only exists in a secure context (HTTPS or
+    // localhost). On plain-HTTP (e.g. the staging IP) it's undefined, so we
+    // fall back to the legacy execCommand('copy') via a hidden textarea.
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(resumeUrl);
+        markCopied();
+        return;
+      }
+      throw new Error('clipboard API unavailable');
     } catch {
-      toast.error('Could not copy. Select and copy the link manually.');
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = resumeUrl;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) {
+          markCopied();
+          return;
+        }
+        throw new Error('execCommand failed');
+      } catch {
+        toast.error('Could not copy. Select and copy the link manually.');
+      }
     }
   };
 
