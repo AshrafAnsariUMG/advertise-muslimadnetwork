@@ -21,6 +21,13 @@ function PaymentSuccessInner() {
   const sessionId = params.get('session_id');
 
   const [status, setStatus] = useState('polling'); // 'polling' | 'paid' | 'timeout' | 'no-draft'
+
+  // Carry the draft handle to the success page so it can authorize the
+  // post-payment creative upload (falls back to bare URL if no draft).
+  const draftForLink = loadDraft();
+  const continueHref = draftForLink
+    ? `/application-success?${new URLSearchParams({ id: draftForLink.id, token: draftForLink.token }).toString()}`
+    : '/application-success';
   const attemptsRef = useRef(0);
 
   useEffect(() => {
@@ -40,10 +47,13 @@ function PaymentSuccessInner() {
       try {
         const record = await getAdvertiser(draft.id, draft.token);
         if (record?.payment_status === 'paid') {
-          clearDraft();
+          // Do NOT clear the draft yet — the success page needs the id+token
+          // to authorize the post-payment creative upload. It clears the
+          // draft once creatives are submitted (or design service was chosen).
           if (!cancelled) {
             setStatus('paid');
-            setTimeout(() => router.replace('/application-success'), 600);
+            const q = new URLSearchParams({ id: draft.id, token: draft.token }).toString();
+            setTimeout(() => router.replace(`/application-success?${q}`), 600);
           }
           return;
         }
@@ -112,7 +122,7 @@ function PaymentSuccessInner() {
             this tab or continue to the confirmation page.
           </p>
           <a
-            href="/application-success"
+            href={continueHref}
             className="inline-block px-6 py-3 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors"
           >
             Continue

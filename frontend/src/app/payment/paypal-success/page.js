@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { capturePaypalOrder } from '@/lib/api';
-import { clearDraft, loadDraft } from '@/lib/draft-storage';
+import { loadDraft } from '@/lib/draft-storage';
 import PublicShell from '@/components/layout/PublicShell';
 
 /**
@@ -50,8 +50,10 @@ function PaypalSuccessInner() {
           orderId
         );
         if (result?.status === 'paid') {
-          clearDraft();
-          router.replace(result.redirect_to || '/application-success');
+          // Keep the draft handle so the success page can authorize the
+          // post-payment creative upload; it clears the draft afterward.
+          const q = new URLSearchParams({ id: draft.id, token: draft.token }).toString();
+          router.replace(`/application-success?${q}`);
           return;
         }
         // PayPal acknowledged but didn't complete — fall through to cancel

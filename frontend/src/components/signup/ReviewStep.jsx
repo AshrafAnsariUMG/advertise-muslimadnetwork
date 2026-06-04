@@ -14,13 +14,16 @@ import {
 import {
   Building2,
   Target,
-  Image as ImageIcon,
   CheckCircle,
   DollarSign,
   ChevronLeft,
   Pencil,
+  Link as LinkIcon,
+  Palette,
 } from 'lucide-react';
-import AdCreativeStep from './AdCreativeStep';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { createPaypalCheckout, createStripeCheckout } from '@/lib/api';
 
 const DATE_FMT = new Intl.DateTimeFormat('en-US', {
@@ -75,6 +78,13 @@ export default function ReviewStep({
   const paymentSectionRef = useRef(null);
   const [redirecting, setRedirecting] = useState(null); // null | 'stripe' | 'paypal'
 
+  // Pre-fill the target URL from the user's website if they haven't set one.
+  useEffect(() => {
+    if (!formData.ad_destination_url && formData.website_url) {
+      updateFormData({ ad_destination_url: formData.website_url });
+    }
+  }, [formData.ad_destination_url, formData.website_url, updateFormData]);
+
   // Auto-scroll to the payment section when the review loads (matches base44)
   useEffect(() => {
     const id = setTimeout(() => {
@@ -90,14 +100,10 @@ export default function ReviewStep({
   const startDate = formatDate(formData.campaign_start_date);
   const endDate = formatDate(formData.campaign_end_date);
 
-  // Front-end mirror of the backend submission gate. Payment can be
-  // initiated only when this is true; the backend re-validates regardless.
-  const hasCreatives =
-    Array.isArray(formData.ad_creatives) && formData.ad_creatives.length > 0;
-  const canPay =
-    !!advertiserId &&
-    !!accessToken &&
-    (hasCreatives || !!formData.design_service);
+  // Creatives are no longer collected before payment — they're uploaded on
+  // the success page. The only pre-payment requirement is a saved draft;
+  // the backend submission gate re-validates the campaign fields at checkout.
+  const canPay = !!advertiserId && !!accessToken;
 
   const handleStripeCheckout = async () => {
     if (!canPay || redirecting) return;
@@ -302,16 +308,56 @@ export default function ReviewStep({
           </CardContent>
         </Card>
 
-        {/* Ad Creatives — upload + design-service toggle live here */}
+        {/* Target URL + Design Service — creatives themselves are uploaded
+            AFTER payment, on the success page. */}
         <Card className="border-indigo-100 shadow-sm">
-          <SectionHeader icon={ImageIcon} title="Ad Creatives & Target URL" />
+          <SectionHeader icon={LinkIcon} title="Target URL" />
           <CardContent>
-            <AdCreativeStep
-              formData={formData}
-              updateFormData={updateFormData}
-              advertiserId={advertiserId}
-              accessToken={accessToken}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="ad_destination_url">
+                Where should your ad clicks go? *
+              </Label>
+              <Input
+                id="ad_destination_url"
+                type="url"
+                inputMode="url"
+                placeholder="https://your-website.com/landing-page"
+                value={formData.ad_destination_url || ''}
+                onChange={(e) =>
+                  updateFormData({ ad_destination_url: e.target.value })
+                }
+              />
+              <p className="text-xs text-gray-500">
+                The page visitors land on when they click your ad.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Design service — paid alternative to uploading your own creatives */}
+        <Card className="border-indigo-100 shadow-sm">
+          <SectionHeader icon={Palette} title="Ad Design" />
+          <CardContent>
+            <div className="flex items-start justify-between gap-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900">
+                  Let our team design your ads{' '}
+                  <span className="text-indigo-600">(+$200)</span>
+                </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Skip the upload — our designers create professional banner
+                  creatives for you. Leave this off to upload your own right
+                  after checkout.
+                </p>
+              </div>
+              <Switch
+                checked={!!formData.design_service}
+                onCheckedChange={(checked) =>
+                  updateFormData({ design_service: checked })
+                }
+                aria-label="Professional ad design service"
+              />
+            </div>
           </CardContent>
         </Card>
 

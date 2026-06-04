@@ -274,21 +274,9 @@ export default function AdvertiserSignupPage() {
       return true;
     }
 
-    if (currentStep === 2) {
-      // Before payment can be initiated (S6/S7), the user must either upload
-      // at least one creative OR opt into the design service.
-      const hasCreatives =
-        Array.isArray(formData.ad_creatives) &&
-        formData.ad_creatives.length > 0;
-      if (!hasCreatives && !formData.design_service) {
-        setError(
-          'Please upload at least one ad creative or enable the design service'
-        );
-        return false;
-      }
-      return true;
-    }
-
+    // Step 2 (Review) has no creative gate anymore — creatives are collected
+    // AFTER payment (on the success page). Payment readiness is enforced
+    // server-side by the AdvertiserSubmissionGate at checkout.
     return true;
   };
 

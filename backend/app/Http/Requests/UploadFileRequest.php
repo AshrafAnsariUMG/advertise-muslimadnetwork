@@ -18,7 +18,11 @@ class UploadFileRequest extends FormRequest
         return [
             'advertiser_id' => ['required', 'uuid', 'exists:advertisers,id'],
             'access_token'  => ['required', 'string', 'size:64'],
-            'file'          => ['required', 'image', 'mimes:jpeg,jpg,png', 'max:2048'],
+            // Broad gate only — UploadController does genuine type detection
+            // and enforces the per-type rules: images must be one of the four
+            // banner sizes (≤2 MB); videos (CTV only) ≤100 MB. The 100 MB cap
+            // here is the outer ceiling for video.
+            'file'          => ['required', 'file', 'mimes:jpeg,jpg,png,mp4,mov,webm', 'max:102400'],
         ];
     }
 
