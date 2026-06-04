@@ -28,9 +28,14 @@ export default function PublicHeader() {
           href="https://www.muslimadnetwork.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-shrink-0 font-black text-lg text-gray-900 tracking-tight"
+          className="flex-shrink-0"
         >
-          Muslim Ad Network
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/man-logo.png"
+            alt="Muslim Ad Network"
+            className="h-10 w-auto"
+          />
         </a>
 
         {/* Nav */}
