@@ -94,7 +94,7 @@ export default function HowItWorks() {
                 >
                   See featured publishers →
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl">
+                <DialogContent className="sm:max-w-4xl">
                   <DialogHeader>
                     <DialogTitle className="text-xl font-bold text-center mb-2">
                       Featured premium sites &amp; apps — with hundreds more
