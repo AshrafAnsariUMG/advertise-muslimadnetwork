@@ -48,7 +48,8 @@ class StoreAdvertiserRequest extends FormRequest
             'target_location.latitude'    => ['required_with:target_location', 'numeric', 'between:-90,90'],
             'target_location.longitude'   => ['required_with:target_location', 'numeric', 'between:-180,180'],
             'target_location.radius_miles' => ['required_with:target_location', 'numeric', 'gt:0'],
-            'target_location.address'     => ['required_with:target_location', 'string', 'max:500'],
+            // Address is an optional human-readable label — see UpdateAdvertiserRequest.
+            'target_location.address'     => ['nullable', 'string', 'max:500'],
             'target_age_range'         => ['nullable', 'string', 'max:50'],
             'target_gender'            => ['nullable', Rule::enum(TargetGender::class)],
 
