@@ -236,7 +236,7 @@ export default function AdminAuditPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs">Target type</Label>
-              <Select value={targetType} onValueChange={setTargetType}>
+              <Select items={TARGET_TYPES} value={targetType} onValueChange={setTargetType}>
                 <SelectTrigger className="h-9 w-full">
                   <SelectValue />
                 </SelectTrigger>

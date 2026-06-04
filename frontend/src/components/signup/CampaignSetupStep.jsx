@@ -41,6 +41,32 @@ const LocationPicker = dynamic(() => import('./LocationPicker'), {
   ),
 });
 
+// Select option maps — `items` drives the base-ui trigger label (otherwise
+// the trigger shows the raw value). The same arrays render the popup items.
+const OBJECTIVE_OPTIONS = [
+  { value: 'brand_awareness', label: 'Brand Awareness' },
+  { value: 'website_traffic', label: 'Website Traffic' },
+  { value: 'lead_generation', label: 'Lead Generation' },
+  { value: 'donations', label: 'Donations' },
+  { value: 'product_sales', label: 'Product Sales' },
+  { value: 'app_installs', label: 'App Installs' },
+  { value: 'event_promotion', label: 'Event Promotion' },
+  { value: 'drive_foot_traffic', label: 'Drive Foot Traffic' },
+];
+const AGE_OPTIONS = [
+  { value: '18-24', label: '18-24 years' },
+  { value: '25-34', label: '25-34 years' },
+  { value: '35-44', label: '35-44 years' },
+  { value: '45-54', label: '45-54 years' },
+  { value: '55+', label: '55+ years' },
+  { value: 'all', label: 'All ages' },
+];
+const GENDER_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+];
+
 // Pricing constants — must match base44 reference for parity with the live
 // site until cutover.
 const CPM = 5;
@@ -247,6 +273,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
               Campaign Objective *
             </Label>
             <Select
+              items={OBJECTIVE_OPTIONS}
               value={formData.campaign_objective || 'brand_awareness'}
               onValueChange={(value) => {
                 const clickObjectives = [
@@ -268,16 +295,11 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                 <SelectValue placeholder="Select objective" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="brand_awareness">Brand Awareness</SelectItem>
-                <SelectItem value="website_traffic">Website Traffic</SelectItem>
-                <SelectItem value="lead_generation">Lead Generation</SelectItem>
-                <SelectItem value="donations">Donations</SelectItem>
-                <SelectItem value="product_sales">Product Sales</SelectItem>
-                <SelectItem value="app_installs">App Installs</SelectItem>
-                <SelectItem value="event_promotion">Event Promotion</SelectItem>
-                <SelectItem value="drive_foot_traffic">
-                  Drive Foot Traffic
-                </SelectItem>
+                {OBJECTIVE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -798,6 +820,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                   </span>
                 </Label>
                 <Select
+                  items={AGE_OPTIONS}
                   value={formData.target_age_range || ''}
                   onValueChange={(value) =>
                     updateFormData({ target_age_range: value })
@@ -810,12 +833,11 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                     <SelectValue placeholder="All ages" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="18-24">18-24 years</SelectItem>
-                    <SelectItem value="25-34">25-34 years</SelectItem>
-                    <SelectItem value="35-44">35-44 years</SelectItem>
-                    <SelectItem value="45-54">45-54 years</SelectItem>
-                    <SelectItem value="55+">55+ years</SelectItem>
-                    <SelectItem value="all">All ages</SelectItem>
+                    {AGE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -831,6 +853,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                   </span>
                 </Label>
                 <Select
+                  items={GENDER_OPTIONS}
                   value={formData.target_gender || ''}
                   onValueChange={(value) =>
                     updateFormData({ target_gender: value })
@@ -840,9 +863,11 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
+                    {GENDER_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

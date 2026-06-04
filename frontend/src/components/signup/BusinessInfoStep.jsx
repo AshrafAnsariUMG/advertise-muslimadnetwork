@@ -244,6 +244,7 @@ export default function BusinessInfoStep({ formData, updateFormData }) {
             Business Type *
           </Label>
           <Select
+            items={BUSINESS_TYPES}
             value={formData.business_type || ''}
             onValueChange={handleBusinessTypeChange}
           >

@@ -450,7 +450,7 @@ export default function AdminReviewPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs">Payment method</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <Select items={PAYMENT_METHODS} value={paymentMethod} onValueChange={setPaymentMethod}>
                 <SelectTrigger className="h-9 w-full">
                   <SelectValue />
                 </SelectTrigger>

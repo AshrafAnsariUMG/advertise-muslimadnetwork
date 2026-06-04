@@ -80,6 +80,16 @@ const AGE_OPTIONS = [
   { value: 2880, label: '> 48 hours' },
   { value: 10080, label: '> 7 days' },
 ];
+// String-valued mirror for the base-ui Select `items` (the select value is a
+// string; setMinAge parses it back to int).
+const AGE_ITEMS = AGE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }));
+
+const SORT_OPTIONS = [
+  { value: 'created_at:asc', label: 'Oldest first' },
+  { value: 'created_at:desc', label: 'Newest first' },
+  { value: 'monthly_budget:desc', label: 'Highest budget' },
+  { value: 'recovery_email_sent_date:desc', label: 'Recently emailed' },
+];
 
 const PER_PAGE = 15;
 const DEBOUNCE_MS = 300;
@@ -411,6 +421,7 @@ export default function AdminAbandonedPage() {
             <div className="space-y-1.5">
               <Label className="text-xs">Minimum age</Label>
               <Select
+                items={AGE_ITEMS}
                 value={String(minAge)}
                 onValueChange={(v) => setMinAge(parseInt(v, 10))}
               >
@@ -418,8 +429,8 @@ export default function AdminAbandonedPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {AGE_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={String(o.value)}>
+                  {AGE_ITEMS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
                       {o.label}
                     </SelectItem>
                   ))}
@@ -430,6 +441,7 @@ export default function AdminAbandonedPage() {
             <div className="space-y-1.5">
               <Label className="text-xs">Sort</Label>
               <Select
+                items={SORT_OPTIONS}
                 value={`${sort}:${direction}`}
                 onValueChange={(v) => {
                   const [s, d] = v.split(':');
@@ -441,10 +453,11 @@ export default function AdminAbandonedPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="created_at:asc">Oldest first</SelectItem>
-                  <SelectItem value="created_at:desc">Newest first</SelectItem>
-                  <SelectItem value="monthly_budget:desc">Highest budget</SelectItem>
-                  <SelectItem value="recovery_email_sent_date:desc">Recently emailed</SelectItem>
+                  {SORT_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
