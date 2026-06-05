@@ -466,7 +466,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
             }`}
           >
             <div className="p-6">
-              <div className="flex items-start gap-6 mb-6">
+              <div className="flex flex-col md:flex-row items-stretch md:items-start gap-4 md:gap-6 mb-6">
                 <div className="flex items-start gap-4 flex-1">
                   <Checkbox
                     id="has_ctv"
@@ -528,7 +528,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                   </div>
                 </div>
 
-                <div className="bg-purple-50 rounded-lg p-4 text-center min-w-fit">
+                <div className="bg-purple-50 rounded-lg p-4 text-center w-full md:w-auto md:min-w-fit">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Users className="w-5 h-5 text-purple-600" />
                     <span className="text-2xl font-bold text-purple-600">
@@ -588,7 +588,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
               {formData.has_ctv &&
               formData.campaign_objective === 'brand_awareness' ? (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                     <div>
                       <div className="flex items-center justify-center gap-1 mb-1">
                         <Eye className="w-4 h-4 text-indigo-500" />
@@ -639,7 +639,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                   </p>
                 </div>
               ) : metrics.isDriveFootTraffic ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 mb-2">
                       <Eye className={`w-4 h-4 ${colors.icon}`} />
@@ -647,7 +647,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                         Monthly Total Ad Views
                       </p>
                     </div>
-                    <p className={`text-3xl font-bold ${colors.text}`}>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
                       {metrics.adViews.toLocaleString()}
                     </p>
                   </div>
@@ -656,7 +656,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                       <Users className="w-4 h-4 text-green-600" />
                       <p className="text-sm text-gray-600">Estimated Visits</p>
                     </div>
-                    <p className="text-3xl font-bold text-green-600">
+                    <p className="text-2xl sm:text-3xl font-bold break-words text-green-600">
                       {metrics.minVisits.toLocaleString()}–
                       {metrics.maxVisits.toLocaleString()}
                     </p>
@@ -664,13 +664,13 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                   </div>
                 </div>
               ) : metrics.isWebsiteTraffic ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 mb-2">
                       <MousePointerClick className={`w-4 h-4 ${colors.icon}`} />
                       <p className="text-sm text-gray-600">Total Clicks</p>
                     </div>
-                    <p className={`text-3xl font-bold ${colors.text}`}>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
                       {metrics.totalClicks.toLocaleString()}
                     </p>
                   </div>
@@ -681,19 +681,19 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                         Monthly Total Ad Views
                       </p>
                     </div>
-                    <p className={`text-3xl font-bold ${colors.text}`}>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
                       {metrics.totalImpressions.toLocaleString()}
                     </p>
                   </div>
                 </div>
               ) : metrics.showLeadProjections ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 mb-2">
                       <MousePointerClick className={`w-4 h-4 ${colors.icon}`} />
                       <p className="text-sm text-gray-600">Total Clicks</p>
                     </div>
-                    <p className={`text-3xl font-bold ${colors.text}`}>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
                       {metrics.totalClicks.toLocaleString()}
                     </p>
                   </div>
@@ -702,14 +702,14 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                       <Users className="w-4 h-4 text-green-600" />
                       <p className="text-sm text-gray-600">Expected Leads</p>
                     </div>
-                    <p className="text-3xl font-bold text-green-600">
+                    <p className="text-2xl sm:text-3xl font-bold break-words text-green-600">
                       {metrics.minPotentialLeads.toLocaleString()} -{' '}
                       {metrics.maxPotentialLeads.toLocaleString()}
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 mb-2">
                       <Eye className={`w-4 h-4 ${colors.icon}`} />
@@ -717,7 +717,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                         Monthly Total Ad Views
                       </p>
                     </div>
-                    <p className={`text-3xl font-bold ${colors.text}`}>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
                       {metrics.totalImpressions.toLocaleString()}
                     </p>
                   </div>
@@ -728,7 +728,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                         Est Muslim Audience Reach
                       </p>
                     </div>
-                    <p className={`text-3xl font-bold ${colors.text}`}>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
                       {metrics.minReach.toLocaleString()} -{' '}
                       {metrics.maxReach.toLocaleString()}
                     </p>
