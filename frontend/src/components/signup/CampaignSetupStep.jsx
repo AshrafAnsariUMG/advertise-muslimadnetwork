@@ -27,7 +27,6 @@ import {
   Tv,
   CheckCircle2,
 } from 'lucide-react';
-import BudgetRecommendation from './BudgetRecommendation';
 import CountryMultiSelect from './CountryMultiSelect';
 
 // Leaflet relies on `window`/`document`, so the picker is loaded only on the
@@ -66,6 +65,24 @@ const GENDER_OPTIONS = [
   { value: 'male', label: 'Male' },
   { value: 'female', label: 'Female' },
 ];
+
+// Minimum campaign length. End date auto-fills to start + this, and can't be
+// set earlier than that.
+const MIN_CAMPAIGN_DAYS = 30;
+
+// Add days to a YYYY-MM-DD string, parsing/formatting in LOCAL time to avoid
+// the new Date('YYYY-MM-DD')=UTC-midnight off-by-one in non-UTC timezones.
+function addDays(dateStr, days) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
 
 // Pricing constants — must match base44 reference for parity with the live
 // site until cutover.
@@ -438,13 +455,6 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
           <span>$10,000</span>
         </div>
 
-        {/* Industry-specific recommendation nudge */}
-        <BudgetRecommendation
-          businessType={formData.business_type}
-          currentBudget={formData.monthly_budget}
-          onBudgetChange={(value) => updateFormData({ monthly_budget: value })}
-        />
-
         {/* CTV add-on — brand_awareness only */}
         {(formData.campaign_objective === 'brand_awareness' ||
           !formData.campaign_objective) && (
@@ -507,8 +517,11 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                       <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#662d91] text-white text-xs font-bold tracking-tight">
                         Roku
                       </span>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f9a01b] text-black text-xs font-bold tracking-tight">
-                        Sling
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#e5a00d] text-black text-xs font-bold tracking-tight">
+                        Plex
+                      </span>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#ff0000] text-white text-xs font-bold tracking-tight">
+                        YouTube
                       </span>
                       <span className="text-xs text-gray-600">&amp; more</span>
                     </div>
@@ -746,9 +759,11 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
               type="date"
               value={formData.campaign_start_date || ''}
               onChange={(e) =>
+                // Auto-fill the end date to start + 30 days whenever the start
+                // changes (the end is then editable forward, but not earlier).
                 updateFormData({
                   campaign_start_date: e.target.value,
-                  campaign_end_date: '',
+                  campaign_end_date: addDays(e.target.value, MIN_CAMPAIGN_DAYS),
                 })
               }
               className="h-12"
@@ -771,9 +786,11 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                 updateFormData({ campaign_end_date: e.target.value })
               }
               className="h-12"
+              // Can't end earlier than 30 days after the start date.
               min={
-                formData.campaign_start_date ||
-                new Date().toISOString().split('T')[0]
+                formData.campaign_start_date
+                  ? addDays(formData.campaign_start_date, MIN_CAMPAIGN_DAYS)
+                  : new Date().toISOString().split('T')[0]
               }
             />
           </div>

@@ -262,13 +262,14 @@ export default function AdvertiserSignupPage() {
 
       const start = new Date(formData.campaign_start_date);
       const end = new Date(formData.campaign_end_date);
-      if (
-        !Number.isNaN(start.getTime()) &&
-        !Number.isNaN(end.getTime()) &&
-        end <= start
-      ) {
-        setError('Campaign end date must be after the start date');
-        return false;
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+        // Campaign must run at least 30 days — end >= start + 30.
+        const minEnd = new Date(start);
+        minEnd.setDate(minEnd.getDate() + 30);
+        if (end < minEnd) {
+          setError('Campaign must run for at least 30 days from the start date');
+          return false;
+        }
       }
 
       return true;
