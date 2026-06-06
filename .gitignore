@@ -4,6 +4,9 @@ _base44-reference/
 # Local-only scratch / screenshots used during agent sessions
 tempImages/
 
+# Server-specific nginx config (lives in /etc/nginx; not part of the app)
+nginx-advertise.conf
+
 # Environment files
 backend/.env
 backend/.env.*
