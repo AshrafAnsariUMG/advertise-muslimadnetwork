@@ -39,7 +39,10 @@ class AbandonedController extends Controller
     private const PER_PAGE = 15;
     private const SORTABLE_COLUMNS = [
         'created_at',
-        'monthly_budget',
+        'updated_at',       // "inactive for" — time since last activity
+        'business_name',
+        'contact_name',
+        'monthly_budget',   // "potential"
         'recovery_email_sent_date',
     ];
     private const INCOMPLETE_STAGES = [

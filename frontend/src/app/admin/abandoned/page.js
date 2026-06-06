@@ -85,9 +85,16 @@ const AGE_OPTIONS = [
 const AGE_ITEMS = AGE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }));
 
 const SORT_OPTIONS = [
+  { value: 'created_at:desc', label: 'Most recent first' }, // default
   { value: 'created_at:asc', label: 'Oldest first' },
-  { value: 'created_at:desc', label: 'Newest first' },
-  { value: 'monthly_budget:desc', label: 'Highest budget' },
+  { value: 'business_name:asc', label: 'Business (A–Z)' },
+  { value: 'business_name:desc', label: 'Business (Z–A)' },
+  { value: 'contact_name:asc', label: 'Contact (A–Z)' },
+  { value: 'contact_name:desc', label: 'Contact (Z–A)' },
+  { value: 'updated_at:asc', label: 'Most inactive first' },
+  { value: 'updated_at:desc', label: 'Least inactive first' },
+  { value: 'monthly_budget:desc', label: 'Highest potential' },
+  { value: 'monthly_budget:asc', label: 'Lowest potential' },
   { value: 'recovery_email_sent_date:desc', label: 'Recently emailed' },
 ];
 
@@ -155,7 +162,7 @@ export default function AdminAbandonedPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sort, setSort] = useState('created_at');
-  const [direction, setDirection] = useState('asc'); // oldest first by default
+  const [direction, setDirection] = useState('desc'); // most recent first by default
   const [page, setPage] = useState(1);
 
   // Server state
@@ -229,11 +236,11 @@ export default function AdminAbandonedPage() {
 
   const clearFilters = () => {
     setStages(['incomplete_step_1', 'incomplete_step_2', 'incomplete_step_3']);
-    setMinAge(24);
+    setMinAge(5);
     setHasEmail(true);
     setSearch('');
     setSort('created_at');
-    setDirection('asc');
+    setDirection('desc'); // most recent first
   };
 
   const rows = data?.data || [];
