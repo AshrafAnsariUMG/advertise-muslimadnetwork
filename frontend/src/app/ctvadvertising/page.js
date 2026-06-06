@@ -8,7 +8,7 @@ import PublicShell from '@/components/layout/PublicShell';
 const platforms = [
   {
     name: "Hulu",
-    logo: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/6ad8a2d4f_hululogo.svg",
+    logo: "/marketing/6ad8a2d4f_hululogo.svg",
     color: "from-green-400 to-green-600",
     bg: "bg-green-50",
     border: "border-green-200",
@@ -18,7 +18,7 @@ const platforms = [
   },
   {
     name: "YouTube TV",
-    logo: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/151b22aa5_YouTube-TV-Logo.png",
+    logo: "/marketing/151b22aa5_YouTube-TV-Logo.png",
     color: "from-red-500 to-red-600",
     bg: "bg-red-50",
     border: "border-red-200",
@@ -28,7 +28,7 @@ const platforms = [
   },
   {
     name: "Peacock",
-    logo: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/294aa117a_peacocklogoofficial.jpg",
+    logo: "/marketing/294aa117a_peacocklogoofficial.jpg",
     color: "from-purple-500 to-indigo-600",
     bg: "bg-purple-50",
     border: "border-purple-200",

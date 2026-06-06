@@ -15,7 +15,7 @@ const SCHEDULER_URL =
 const NAV_LINKS = [
   { label: 'Home', href: 'https://muslimadnetwork.com/' },
   { label: 'Why MuslimReach™', href: '/whymuslimreach', internal: true },
-  { label: 'For Charities', href: 'https://muslimadnetwork.com/advertise-your-charity' },
+  { label: 'For Charities', href: '/charitysignup', internal: true },
 ];
 
 export default function PublicHeader() {

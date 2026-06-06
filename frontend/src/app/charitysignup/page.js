@@ -51,7 +51,7 @@ export default function CharitySignup() {
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
           <div
             className="absolute inset-0 bg-cover bg-center opacity-[0.08]"
-            style={{ backgroundImage: "url('https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/36418ed7c_Muslimconsumerondevice.png')" }}
+            style={{ backgroundImage: "url('/marketing/36418ed7c_Muslimconsumerondevice.png')" }}
           />
         </div>
 
@@ -130,7 +130,7 @@ export default function CharitySignup() {
               {/* Device Mockup Image */}
               <div className="mb-1 flex justify-center">
                 <img
-                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/474957051_AdsScreenshot.png"
+                  src="/marketing/474957051_AdsScreenshot.png"
                   alt="Ad placements across desktop, tablet, and mobile devices"
                   className="w-full max-w-md"
                 />
@@ -176,12 +176,12 @@ export default function CharitySignup() {
               <p className="text-center text-gray-900 font-semibold text-xl mb-8">Trusted by leading charities worldwide</p>
             <div className="flex flex-wrap justify-center items-center gap-16">
             <img
-              src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/e69c8e6d6_life-for-relief-and-development-logo.png"
+              src="/marketing/e69c8e6d6_life-for-relief-and-development-logo.png"
               alt="Life for Relief"
               className="h-20 object-contain hover:opacity-80 transition-all"
             />
             <img
-              src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/77c18dd15_UNHCRLogo.png"
+              src="/marketing/77c18dd15_UNHCRLogo.png"
               alt="UNHCR"
               className="h-20 object-contain hover:opacity-80 transition-all"
             />
@@ -344,7 +344,7 @@ export default function CharitySignup() {
 
             <div className="relative">
               <img
-                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/e257533ce_muslim-people-giving-donation-in-ramadan-hoy-month-flat-cartoon-illustration-vector.jpg"
+                src="/marketing/e257533ce_muslim-people-giving-donation-in-ramadan-hoy-month-flat-cartoon-illustration-vector.jpg"
                 alt="Charity impact"
                 className="rounded-2xl shadow-2xl"
               />

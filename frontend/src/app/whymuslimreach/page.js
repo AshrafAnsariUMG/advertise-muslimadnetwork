@@ -14,28 +14,28 @@ const masjids = [
     detail: "High-affluence community · One of the largest mosques in America",
     attendees: "7,000+",
     attendeesLabel: "Weekly Attendees",
-    img: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/e1152cfe7_ISOCMasjid.png",
+    img: "/marketing/e1152cfe7_ISOCMasjid.png",
     link: "https://isocmasjid.org/"
   },
   {
     name: "Jersey Masjid Islamic Center (JMIC)",
     location: "Boonton, NJ",
     detail: "Serving the Greater New Jersey Muslim community",
-    img: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/1ec74c14c_JMICMasjid.png",
+    img: "/marketing/1ec74c14c_JMICMasjid.png",
     link: "https://jmic.org/"
   },
   {
     name: "Islamic Center of Irvine (ICOI)",
     location: "Irvine, CA",
     detail: "Serving the Irvine & greater Orange County Muslim community",
-    img: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/b557c9dfc_ICOIMasjid2.png",
+    img: "/marketing/b557c9dfc_ICOIMasjid2.png",
     link: "https://www.icoirvine.org/"
   }
 ];
 
 const channels = [
   {
-    icon: <img src="https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/0ce2c91e8_device.png" alt="Digital Network" className="w-12 h-12 object-contain" />,
+    icon: <img src="/marketing/0ce2c91e8_device.png" alt="Digital Network" className="w-12 h-12 object-contain" />,
     color: "from-blue-500 to-indigo-600",
     bg: "bg-white",
     border: "border-gray-200",
@@ -47,7 +47,7 @@ const channels = [
     statLabel: "Globally"
   },
   {
-    icon: <img src="https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/50bd0b452_Mosque.jpeg" alt="Mosque" className="w-12 h-12 object-contain" />,
+    icon: <img src="/marketing/50bd0b452_Mosque.jpeg" alt="Mosque" className="w-12 h-12 object-contain" />,
     color: "from-indigo-500 to-indigo-600",
     bg: "bg-white",
     border: "border-gray-200",
@@ -90,11 +90,11 @@ const whyItWorks = [
 ];
 
 const adPhotos = [
-  { url: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/d811ff326_CooktMC2026ISOC.jpg", label: "Cookt · ISOC" },
-  { url: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/6865af446_EhsaasFoundationMCRamadan2026atISOC.jpg", label: "Ehsaas Foundation · ISOC" },
-  { url: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/1ec1ed18d_AmanaFundsMCRamadan2026atISOC.jpg", label: "Amana Funds · ISOC" },
-  { url: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/bf36cb5e1_EhsaasFoundationMCRamadan2026atICOI.jpg", label: "Ehsaas Foundation · ICOI" },
-  { url: "https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/21dd27ec3_Cookt-MasjidConnectAdatJMICBoonton.jpg", label: "Cookt · JMIC Boonton" },
+  { url: "/marketing/d811ff326_CooktMC2026ISOC.jpg", label: "Cookt · ISOC" },
+  { url: "/marketing/6865af446_EhsaasFoundationMCRamadan2026atISOC.jpg", label: "Ehsaas Foundation · ISOC" },
+  { url: "/marketing/1ec1ed18d_AmanaFundsMCRamadan2026atISOC.jpg", label: "Amana Funds · ISOC" },
+  { url: "/marketing/bf36cb5e1_EhsaasFoundationMCRamadan2026atICOI.jpg", label: "Ehsaas Foundation · ICOI" },
+  { url: "/marketing/21dd27ec3_Cookt-MasjidConnectAdatJMICBoonton.jpg", label: "Cookt · JMIC Boonton" },
 ];
 
 export default function WhyMuslimReach() {

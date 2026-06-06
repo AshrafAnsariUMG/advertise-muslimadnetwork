@@ -20,26 +20,25 @@ import {
  * checkmarks at the bottom. Step 1 has a device-mockup illustration and a
  * "See featured publishers" button that opens a 12-logo dialog.
  *
- * Publisher logo URLs reuse base44's existing CDN (same files currently
- * serving the live advertise.muslimadnetwork.com). If those ever rotate,
- * mirror them into /public and swap.
+ * Publisher logos + device mockup are served locally from /public/marketing
+ * (mirrored off base44's CDN before base44 was decommissioned).
  */
 const ADS_MOCKUP_URL =
-  'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/474957051_AdsScreenshot.png';
+  '/marketing/474957051_AdsScreenshot.png';
 
 const PUBLISHERS = [
-  { name: 'Al Jazeera',          src: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/ae568d35c_aljazeeralogo.png',           wrap: 'bg-white' },
-  { name: 'My Halal Scanner',    src: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/83d3feade_MyHalalScanner.jpeg',          wrap: 'bg-white' },
-  { name: 'Ummah Jobs',          src: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/b2f0f6800_ummahjobslogo.png',           wrap: 'bg-white' },
-  { name: 'IslamicFinder',       src: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/f8b332a40_Screenshot2025-12-28at82936PM.png', wrap: 'bg-gray-900' },
-  { name: 'About Islam',         src: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/9cf5505cd_AboutIslamlogo.png',          wrap: 'bg-white' },
-  { name: 'CNN',                 src: 'https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/706054d0c_generated_image.png',                                                       wrap: 'bg-white' },
-  { name: 'Muslim Travel Girl',  src: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/08d12351c_MTG-new-logo-2020-450px.png', wrap: 'bg-white' },
-  { name: 'The New York Times',  src: 'https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/67f5936fd_New-York-Times-Logo.jpg',                                                   wrap: 'bg-white' },
-  { name: 'Muslima',             src: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68dc7a391cd3daa2a3e2a6e3/aba1ccd9c_muslimapub.png',              wrap: 'bg-white' },
-  { name: 'Hulu',                src: 'https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/6ad8a2d4f_hululogo.svg',                                                              wrap: 'bg-green-50 border-green-200' },
-  { name: 'YouTube TV',          src: 'https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/151b22aa5_YouTube-TV-Logo.png',                                                      wrap: 'bg-red-50 border-red-200' },
-  { name: 'Peacock',             src: 'https://media.base44.com/images/public/68dc7a391cd3daa2a3e2a6e3/294aa117a_peacocklogoofficial.jpg',                                                  wrap: 'bg-purple-50 border-purple-200' },
+  { name: 'Al Jazeera',          src: '/marketing/ae568d35c_aljazeeralogo.png',           wrap: 'bg-white' },
+  { name: 'My Halal Scanner',    src: '/marketing/83d3feade_MyHalalScanner.jpeg',          wrap: 'bg-white' },
+  { name: 'Ummah Jobs',          src: '/marketing/b2f0f6800_ummahjobslogo.png',           wrap: 'bg-white' },
+  { name: 'IslamicFinder',       src: '/marketing/f8b332a40_Screenshot2025-12-28at82936PM.png', wrap: 'bg-gray-900' },
+  { name: 'About Islam',         src: '/marketing/9cf5505cd_AboutIslamlogo.png',          wrap: 'bg-white' },
+  { name: 'CNN',                 src: '/marketing/706054d0c_generated_image.png',                                                       wrap: 'bg-white' },
+  { name: 'Muslim Travel Girl',  src: '/marketing/08d12351c_MTG-new-logo-2020-450px.png', wrap: 'bg-white' },
+  { name: 'The New York Times',  src: '/marketing/67f5936fd_New-York-Times-Logo.jpg',                                                   wrap: 'bg-white' },
+  { name: 'Muslima',             src: '/marketing/aba1ccd9c_muslimapub.png',              wrap: 'bg-white' },
+  { name: 'Hulu',                src: '/marketing/6ad8a2d4f_hululogo.svg',                                                              wrap: 'bg-green-50 border-green-200' },
+  { name: 'YouTube TV',          src: '/marketing/151b22aa5_YouTube-TV-Logo.png',                                                      wrap: 'bg-red-50 border-red-200' },
+  { name: 'Peacock',             src: '/marketing/294aa117a_peacocklogoofficial.jpg',                                                  wrap: 'bg-purple-50 border-purple-200' },
 ];
 
 export default function HowItWorks() {

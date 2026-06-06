@@ -13,10 +13,11 @@ const FOOTER_LINKS = [
   { label: 'About', href: '/about', internal: true },
   { label: 'Contact', href: '/contact', internal: true },
   { label: 'Why MuslimReach™', href: '/whymuslimreach', internal: true },
-  { label: 'CTV Advertising', href: 'https://muslimadnetwork.com/ctv-advertising' },
-  { label: 'Halal Advertising', href: 'https://muslimadnetwork.com/halal-advertising' },
-  { label: 'Islamic Advertising', href: 'https://muslimadnetwork.com/islamic-advertising' },
-  { label: 'Charity Advertising', href: 'https://muslimadnetwork.com/advertise-your-charity' },
+  { label: 'Muslim Advertising', href: '/muslimadvertising', internal: true },
+  { label: 'CTV Advertising', href: '/ctvadvertising', internal: true },
+  { label: 'Halal Advertising', href: '/halaladvertising', internal: true },
+  { label: 'Islamic Advertising', href: '/islamicadvertising', internal: true },
+  { label: 'Charity Advertising', href: '/muslimcharityadvertising', internal: true },
 ];
 
 export default function PublicFooter() {
