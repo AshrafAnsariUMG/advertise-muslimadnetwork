@@ -133,8 +133,12 @@ class AbandonedController extends Controller
 
         Mail::to($advertiser->contact_email)->queue(new AbandonedCartRecovery($advertiser));
 
+        // Don't bump updated_at — it's the customer-inactivity clock the
+        // abandoned list filters on. An admin emailing the lead is NOT
+        // customer activity, so the row must stay visible (just "Emailed ✓").
         $advertiser->recovery_email_sent = true;
         $advertiser->recovery_email_sent_date = now();
+        $advertiser->timestamps = false;
         $advertiser->save();
 
         AuditLogger::log(
@@ -207,6 +211,7 @@ class AbandonedController extends Controller
 
             $advertiser->recovery_email_sent = true;
             $advertiser->recovery_email_sent_date = now();
+            $advertiser->timestamps = false; // keep the inactivity clock intact
             $advertiser->save();
             $dispatched++;
         }
@@ -266,6 +271,7 @@ class AbandonedController extends Controller
             // skip-if-already-pushed check doesn't no-op.
             if ($force && $advertiser->pushed_to_pipedrive) {
                 $advertiser->pushed_to_pipedrive = false;
+                $advertiser->timestamps = false; // keep the inactivity clock intact
                 $advertiser->save();
             }
 

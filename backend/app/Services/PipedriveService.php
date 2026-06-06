@@ -285,9 +285,13 @@ class PipedriveService
             ]);
         }
 
+        // Don't bump updated_at — pushing to Pipedrive is a system action,
+        // not customer activity. (Matters for abandoned pushes, which the
+        // /admin/abandoned list filters by updated_at; harmless for paid.)
         $advertiser->pushed_to_pipedrive = true;
         $advertiser->pipedrive_deal_id = (string) $dealId;
         $advertiser->pipedrive_pushed_at = now();
+        $advertiser->timestamps = false;
         $advertiser->save();
 
         AuditLogger::log(
