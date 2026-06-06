@@ -510,6 +510,40 @@ export default function AdminAbandonedPage() {
         </Alert>
       )}
 
+      {/* Prominent bulk action bar — shows at the top of the table whenever
+          rows are selected (sticky so it stays in reach while scrolling). */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-16 z-30 flex flex-wrap items-center gap-3 rounded-xl border-2 border-indigo-300 bg-indigo-600 text-white px-4 py-3 shadow-lg">
+          <span className="text-sm font-semibold">
+            {selectedIds.size} selected
+          </span>
+          <span className="h-5 w-px bg-indigo-300/60" />
+          <Button
+            size="sm"
+            onClick={() => setBulkAction('send')}
+            className="bg-white text-indigo-700 hover:bg-indigo-50 h-9 font-semibold"
+          >
+            <Mail className="w-4 h-4 mr-1.5" />
+            Send recovery
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setBulkAction('push')}
+            className="bg-white text-indigo-700 hover:bg-indigo-50 h-9 font-semibold"
+          >
+            <Send className="w-4 h-4 mr-1.5" />
+            Push to Pipedrive
+          </Button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto text-sm text-indigo-100 hover:text-white underline"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <Card>
         <CardContent className="pt-6">
@@ -678,42 +712,6 @@ export default function AdminAbandonedPage() {
         </CardContent>
       </Card>
 
-      {/* Bulk action bar */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-full shadow-2xl px-5 py-2.5 flex items-center gap-3 z-40">
-          <span className="text-sm font-medium">
-            {selectedIds.size} selected
-          </span>
-          <span className="h-4 w-px bg-slate-700" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setBulkAction('send')}
-            className="text-white hover:bg-slate-800 hover:text-white h-8"
-          >
-            <Mail className="w-3.5 h-3.5 mr-1.5" />
-            Send recovery
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setBulkAction('push')}
-            className="text-white hover:bg-slate-800 hover:text-white h-8"
-          >
-            <Send className="w-3.5 h-3.5 mr-1.5" />
-            Push to Pipedrive
-          </Button>
-          <span className="h-4 w-px bg-slate-700" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedIds(new Set())}
-            className="text-slate-300 hover:bg-slate-800 hover:text-white h-8"
-          >
-            Clear
-          </Button>
-        </div>
-      )}
 
       {/* Detail sheet */}
       <Sheet

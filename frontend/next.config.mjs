@@ -17,12 +17,12 @@
  */
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://static.cloudflareinsights.com https://webforms.pipedrive.com https://*.pipedrive.com https://js.stripe.com https://www.paypal.com https://www.paypalobjects.com",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://www.googletagmanager.com https://*.doubleclick.net https://*.google.com https://www.google.com https://cdnjs.cloudflare.com https://*.tile.openstreetmap.org https://webforms.pipedrive.com https://*.pipedrive.com",
-  "font-src 'self' data:",
-  "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.doubleclick.net https://*.google.com https://api.stripe.com https://cloudflareinsights.com https://static.cloudflareinsights.com https://webforms.pipedrive.com https://*.pipedrive.com",
-  "frame-src 'self' https://webforms.pipedrive.com https://*.pipedrive.com https://js.stripe.com https://hooks.stripe.com https://*.paypal.com https://*.doubleclick.net",
+  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://static.cloudflareinsights.com https://webforms.pipedrive.com https://*.pipedrive.com https://*.pipedriveassets.com https://js.stripe.com https://www.paypal.com https://www.paypalobjects.com",
+  "style-src 'self' 'unsafe-inline' https://*.pipedriveassets.com",
+  "img-src 'self' data: blob: https://www.googletagmanager.com https://*.doubleclick.net https://*.google.com https://www.google.com https://cdnjs.cloudflare.com https://*.tile.openstreetmap.org https://webforms.pipedrive.com https://*.pipedrive.com https://*.pipedriveassets.com",
+  "font-src 'self' data: https://*.pipedriveassets.com",
+  "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.doubleclick.net https://*.google.com https://api.stripe.com https://cloudflareinsights.com https://static.cloudflareinsights.com https://webforms.pipedrive.com https://*.pipedrive.com https://*.pipedriveassets.com",
+  "frame-src 'self' https://webforms.pipedrive.com https://*.pipedrive.com https://*.pipedriveassets.com https://js.stripe.com https://hooks.stripe.com https://*.paypal.com https://*.doubleclick.net",
   "frame-ancestors 'self'",
   "object-src 'none'",
   "base-uri 'self'",
