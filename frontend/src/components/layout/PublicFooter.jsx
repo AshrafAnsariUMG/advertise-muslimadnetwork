@@ -1,16 +1,18 @@
 'use client';
 
+import Link from 'next/link';
 import { Mail, Phone, MapPin } from 'lucide-react';
 
 /**
- * Public-site footer. Section links point to the marketing site
- * (muslimadnetwork.com) since those pages aren't part of this app.
+ * Public-site footer. Links flagged `internal` are pages ported into this
+ * app; the rest point out to the main marketing site (muslimadnetwork.com).
+ * Batch 2/3 marketing pages get switched to internal as they're approved.
  */
 const FOOTER_LINKS = [
   { label: 'Muslim Ad Network', href: 'https://www.muslimadnetwork.com' },
-  { label: 'About', href: 'https://muslimadnetwork.com/about' },
-  { label: 'Contact', href: 'https://muslimadnetwork.com/contact' },
-  { label: 'Why MuslimReach™', href: 'https://muslimadnetwork.com/advertiser-product-overview' },
+  { label: 'About', href: '/about', internal: true },
+  { label: 'Contact', href: '/contact', internal: true },
+  { label: 'Why MuslimReach™', href: '/whymuslimreach', internal: true },
   { label: 'CTV Advertising', href: 'https://muslimadnetwork.com/ctv-advertising' },
   { label: 'Halal Advertising', href: 'https://muslimadnetwork.com/halal-advertising' },
   { label: 'Islamic Advertising', href: 'https://muslimadnetwork.com/islamic-advertising' },
@@ -23,17 +25,27 @@ export default function PublicFooter() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Section links */}
         <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 mb-8">
-          {FOOTER_LINKS.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-gray-600 hover:text-indigo-600 transition-colors"
-            >
-              {link.label}
-            </a>
-          ))}
+          {FOOTER_LINKS.map((link) =>
+            link.internal ? (
+              <Link
+                key={link.label}
+                href={link.href}
+                className="text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+              >
+                {link.label}
+              </a>
+            )
+          )}
         </nav>
 
         {/* Contact */}

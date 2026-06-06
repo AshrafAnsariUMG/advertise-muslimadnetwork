@@ -1,21 +1,20 @@
 'use client';
 
+import Link from 'next/link';
 import { Calendar } from 'lucide-react';
 
 /**
- * Public-site header for the wizard + payment pages.
+ * Public-site header for the wizard, payment, and marketing pages.
  *
- * The marketing pages (Why MuslimReach, CTV, etc.) are NOT part of this
- * Next.js app — they live on the main marketing site. So nav links point
- * out to muslimadnetwork.com rather than to internal routes. The wizard
- * itself lives at `/` on advertise.muslimadnetwork.com.
+ * Links flagged `internal` are pages ported into this app (Next routes);
+ * the rest point out to the main marketing site (muslimadnetwork.com).
  */
 const SCHEDULER_URL =
   'https://muslimadnetwork.pipedrive.com/scheduler/9KmA9sa/muslim-ad-network-advertising-partnership-next-steps';
 
 const NAV_LINKS = [
   { label: 'Home', href: 'https://muslimadnetwork.com/' },
-  { label: 'Why MuslimReach™', href: 'https://muslimadnetwork.com/advertiser-product-overview' },
+  { label: 'Why MuslimReach™', href: '/whymuslimreach', internal: true },
   { label: 'For Charities', href: 'https://muslimadnetwork.com/advertise-your-charity' },
 ];
 
@@ -40,17 +39,27 @@ export default function PublicHeader() {
 
         {/* Nav */}
         <nav className="flex items-center gap-1 sm:gap-2">
-          {NAV_LINKS.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden md:inline-block px-3 py-2 text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors"
-            >
-              {link.label}
-            </a>
-          ))}
+          {NAV_LINKS.map((link) =>
+            link.internal ? (
+              <Link
+                key={link.label}
+                href={link.href}
+                className="hidden md:inline-block px-3 py-2 text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden md:inline-block px-3 py-2 text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors"
+              >
+                {link.label}
+              </a>
+            )
+          )}
           <a
             href={SCHEDULER_URL}
             target="_blank"
