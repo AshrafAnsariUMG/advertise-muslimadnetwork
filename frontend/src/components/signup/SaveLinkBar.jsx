@@ -17,15 +17,22 @@ import { emailDraftLink } from '@/lib/api';
  * The resume URL is built client-side from the current origin so it's always
  * correct regardless of staging vs production host.
  */
-export default function SaveLinkBar({ advertiserId, accessToken, hasEmail }) {
+export default function SaveLinkBar({
+  advertiserId,
+  accessToken,
+  hasEmail,
+  testMode = false,
+}) {
   const [copied, setCopied] = useState(false);
   const [emailing, setEmailing] = useState(false);
 
   if (!advertiserId || !accessToken) return null;
 
+  // Resume back into the same environment the draft was started in.
+  const basePath = testMode ? '/ssco-test' : '/';
   const resumeUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/?return=${advertiserId}&token=${accessToken}`
+      ? `${window.location.origin}${basePath}?return=${advertiserId}&token=${accessToken}`
       : '';
 
   const handleCopy = async () => {

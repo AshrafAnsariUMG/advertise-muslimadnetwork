@@ -143,7 +143,11 @@ function getColorScheme(budget) {
   };
 }
 
-export default function CampaignSetupStep({ formData, updateFormData }) {
+export default function CampaignSetupStep({
+  formData,
+  updateFormData,
+  testMode = false,
+}) {
   // Defaults — only applied on first mount when the field is empty.
   useEffect(() => {
     const updates = {};
@@ -196,19 +200,19 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
   // Omnichannel budget logic (base44 parity): at ≥$1,500 the premium add-ons
   // light up; below that they switch off. CTV is only offered for
   // brand_awareness (that's the only objective whose CTV toggle is visible),
-  // so we only auto-enable has_ctv there — has_masjidconnect applies to any
-  // objective. Returns the updates object to pass to updateFormData.
+  // so we only auto-enable has_ctv there. MasjidConnect is gated behind
+  // testMode — it's not live to the public yet (only on /ssco-test).
   const applyBudgetSideEffects = (budget) => {
     const updates = { monthly_budget: budget };
     const ctvEligible =
       !formData.campaign_objective ||
       formData.campaign_objective === 'brand_awareness';
     if (budget >= ADDON_MIN_BUDGET) {
-      updates.has_masjidconnect = true;
+      if (testMode) updates.has_masjidconnect = true;
       if (ctvEligible) updates.has_ctv = true;
     } else {
       updates.has_ctv = false;
-      updates.has_masjidconnect = false;
+      if (testMode) updates.has_masjidconnect = false;
     }
     return updates;
   };
@@ -473,7 +477,9 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
 
         {(formData.has_ctv || formData.has_masjidconnect) && (
           <p className="text-xs text-purple-600 text-center -mt-2 mb-1">
-            Minimum $1,500/month required for premium add-ons (CTV / MasjidConnect)
+            {testMode
+              ? 'Minimum $1,500/month required for premium add-ons (CTV / MasjidConnect)'
+              : 'Minimum $1,500/month required for Streaming TV Ads'}
           </p>
         )}
 
@@ -684,7 +690,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
 
               {/* MasjidConnect placements — appended under whichever metric
                   branch rendered, whenever the add-on is enabled. */}
-              {formData.has_masjidconnect && (
+              {testMode && formData.has_masjidconnect && (
                 <div className="mt-4 pt-4 border-t border-indigo-100 text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
                     <Monitor className="w-4 h-4 text-indigo-600" />
@@ -818,8 +824,9 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
           </div>
         )}
 
-        {/* MasjidConnect (DOOH) add-on — Masjid Digital Screens. Shown for all
-            objectives (unlike CTV which is brand_awareness-only). */}
+        {/* MasjidConnect (DOOH) add-on — gated behind testMode (not public yet;
+            visible only on /ssco-test). Shown for all objectives. */}
+        {testMode && (
         <div
           className={`mt-4 rounded-xl border-2 transition-all ${
             formData.has_masjidconnect
@@ -902,6 +909,7 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
             </div>
           </div>
         </div>
+        )}
 
       {/* Campaign Dates */}
       <div className="space-y-6 pb-8 border-b-2 border-gray-200">
