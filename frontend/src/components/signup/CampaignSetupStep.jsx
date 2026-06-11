@@ -513,6 +513,199 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
           <span>$10,000</span>
         </div>
 
+        {/* Performance Estimate */}
+        {formData.monthly_budget > 0 && formData.campaign_objective && (
+          <Card
+            className={`${colors.bg} ${colors.border} border-2 mt-6 transition-all duration-300`}
+          >
+            <CardContent className="p-6">
+              <div className="text-center mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-1">
+                  Monthly Campaign Performance Estimate
+                </h3>
+                {metrics.hasBonus && (
+                  <Badge className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-0 shadow-md mt-2">
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    +20% Bonus Included
+                  </Badge>
+                )}
+              </div>
+
+              {formData.has_ctv &&
+              formData.campaign_objective === 'brand_awareness' ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                    <div>
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Eye className="w-4 h-4 text-indigo-500" />
+                        <p className="text-xs text-gray-600">Digital Ad Views</p>
+                      </div>
+                      <p className="text-2xl font-bold text-indigo-600">
+                        {ctvDigitalViews.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Tv className="w-4 h-4 text-purple-600" />
+                        <p className="text-xs text-gray-600">TV Ad Views</p>
+                      </div>
+                      <p className="text-2xl font-bold text-purple-600">
+                        {ctvTvViews.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Sparkles className="w-4 h-4 text-pink-600" />
+                        <p className="text-xs text-gray-600">Total Views</p>
+                      </div>
+                      <p className="text-2xl font-bold text-pink-600">
+                        {ctvTotalViews.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="border-t pt-4 text-center">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <Users className="w-4 h-4 text-indigo-600" />
+                      <p className="text-sm text-gray-600">
+                        Est Muslim Audience Reach
+                      </p>
+                    </div>
+                    <p className="text-2xl font-bold text-indigo-600">
+                      {Math.floor(
+                        ctvTotalViews * MIN_REACH_PERCENTAGE
+                      ).toLocaleString()}{' '}
+                      -{' '}
+                      {Math.floor(
+                        ctvTotalViews * MAX_REACH_PERCENTAGE
+                      ).toLocaleString()}
+                    </p>
+                  </div>
+                  <p className="text-xs text-center text-gray-400">
+                    TV ads appear on streaming platforms and Smart TVs.
+                  </p>
+                </div>
+              ) : metrics.isDriveFootTraffic ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <Eye className={`w-4 h-4 ${colors.icon}`} />
+                      <p className="text-sm text-gray-600">
+                        Monthly Total Ad Views
+                      </p>
+                    </div>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
+                      {metrics.adViews.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <Users className="w-4 h-4 text-green-600" />
+                      <p className="text-sm text-gray-600">Estimated Visits</p>
+                    </div>
+                    <p className="text-2xl sm:text-3xl font-bold break-words text-green-600">
+                      {metrics.minVisits.toLocaleString()}–
+                      {metrics.maxVisits.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">customers</p>
+                  </div>
+                </div>
+              ) : metrics.isWebsiteTraffic ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <MousePointerClick className={`w-4 h-4 ${colors.icon}`} />
+                      <p className="text-sm text-gray-600">Total Clicks</p>
+                    </div>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
+                      {metrics.totalClicks.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <Eye className={`w-4 h-4 ${colors.icon}`} />
+                      <p className="text-sm text-gray-600">
+                        Monthly Total Ad Views
+                      </p>
+                    </div>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
+                      {metrics.totalImpressions.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ) : metrics.showLeadProjections ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <MousePointerClick className={`w-4 h-4 ${colors.icon}`} />
+                      <p className="text-sm text-gray-600">Total Clicks</p>
+                    </div>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
+                      {metrics.totalClicks.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <Users className="w-4 h-4 text-green-600" />
+                      <p className="text-sm text-gray-600">Expected Leads</p>
+                    </div>
+                    <p className="text-2xl sm:text-3xl font-bold break-words text-green-600">
+                      {metrics.minPotentialLeads.toLocaleString()} -{' '}
+                      {metrics.maxPotentialLeads.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <Eye className={`w-4 h-4 ${colors.icon}`} />
+                      <p className="text-sm text-gray-600">
+                        Monthly Total Ad Views
+                      </p>
+                    </div>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
+                      {metrics.totalImpressions.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <Users className={`w-4 h-4 ${colors.icon}`} />
+                      <p className="text-sm text-gray-600">
+                        Est Muslim Audience Reach
+                      </p>
+                    </div>
+                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
+                      {metrics.minReach.toLocaleString()} -{' '}
+                      {metrics.maxReach.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* MasjidConnect placements — appended under whichever metric
+                  branch rendered, whenever the add-on is enabled. */}
+              {formData.has_masjidconnect && (
+                <div className="mt-4 pt-4 border-t border-indigo-100 text-center">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <Monitor className="w-4 h-4 text-indigo-600" />
+                    <p className="text-sm text-gray-600">
+                      Masjid Screen Placements
+                    </p>
+                  </div>
+                  <p className="text-2xl font-bold text-indigo-600">
+                    {masjidCountFor(formData.monthly_budget)} Masjid
+                    {masjidCountFor(formData.monthly_budget) > 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    50 min daily screen time per masjid
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
         {/* CTV add-on — brand_awareness only */}
         {(formData.campaign_objective === 'brand_awareness' ||
           !formData.campaign_objective) && (
@@ -709,199 +902,6 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
             </div>
           </div>
         </div>
-
-        {/* Performance Estimate */}
-        {formData.monthly_budget > 0 && formData.campaign_objective && (
-          <Card
-            className={`${colors.bg} ${colors.border} border-2 mt-6 transition-all duration-300`}
-          >
-            <CardContent className="p-6">
-              <div className="text-center mb-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-1">
-                  Monthly Campaign Performance Estimate
-                </h3>
-                {metrics.hasBonus && (
-                  <Badge className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-0 shadow-md mt-2">
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    +20% Bonus Included
-                  </Badge>
-                )}
-              </div>
-
-              {formData.has_ctv &&
-              formData.campaign_objective === 'brand_awareness' ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-                    <div>
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <Eye className="w-4 h-4 text-indigo-500" />
-                        <p className="text-xs text-gray-600">Digital Ad Views</p>
-                      </div>
-                      <p className="text-2xl font-bold text-indigo-600">
-                        {ctvDigitalViews.toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <Tv className="w-4 h-4 text-purple-600" />
-                        <p className="text-xs text-gray-600">TV Ad Views</p>
-                      </div>
-                      <p className="text-2xl font-bold text-purple-600">
-                        {ctvTvViews.toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <Sparkles className="w-4 h-4 text-pink-600" />
-                        <p className="text-xs text-gray-600">Total Views</p>
-                      </div>
-                      <p className="text-2xl font-bold text-pink-600">
-                        {ctvTotalViews.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="border-t pt-4 text-center">
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <Users className="w-4 h-4 text-indigo-600" />
-                      <p className="text-sm text-gray-600">
-                        Est Muslim Audience Reach
-                      </p>
-                    </div>
-                    <p className="text-2xl font-bold text-indigo-600">
-                      {Math.floor(
-                        ctvTotalViews * MIN_REACH_PERCENTAGE
-                      ).toLocaleString()}{' '}
-                      -{' '}
-                      {Math.floor(
-                        ctvTotalViews * MAX_REACH_PERCENTAGE
-                      ).toLocaleString()}
-                    </p>
-                  </div>
-                  <p className="text-xs text-center text-gray-400">
-                    TV ads appear on streaming platforms and Smart TVs.
-                  </p>
-                </div>
-              ) : metrics.isDriveFootTraffic ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <Eye className={`w-4 h-4 ${colors.icon}`} />
-                      <p className="text-sm text-gray-600">
-                        Monthly Total Ad Views
-                      </p>
-                    </div>
-                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
-                      {metrics.adViews.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <Users className="w-4 h-4 text-green-600" />
-                      <p className="text-sm text-gray-600">Estimated Visits</p>
-                    </div>
-                    <p className="text-2xl sm:text-3xl font-bold break-words text-green-600">
-                      {metrics.minVisits.toLocaleString()}–
-                      {metrics.maxVisits.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">customers</p>
-                  </div>
-                </div>
-              ) : metrics.isWebsiteTraffic ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <MousePointerClick className={`w-4 h-4 ${colors.icon}`} />
-                      <p className="text-sm text-gray-600">Total Clicks</p>
-                    </div>
-                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
-                      {metrics.totalClicks.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <Eye className={`w-4 h-4 ${colors.icon}`} />
-                      <p className="text-sm text-gray-600">
-                        Monthly Total Ad Views
-                      </p>
-                    </div>
-                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
-                      {metrics.totalImpressions.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ) : metrics.showLeadProjections ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <MousePointerClick className={`w-4 h-4 ${colors.icon}`} />
-                      <p className="text-sm text-gray-600">Total Clicks</p>
-                    </div>
-                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
-                      {metrics.totalClicks.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <Users className="w-4 h-4 text-green-600" />
-                      <p className="text-sm text-gray-600">Expected Leads</p>
-                    </div>
-                    <p className="text-2xl sm:text-3xl font-bold break-words text-green-600">
-                      {metrics.minPotentialLeads.toLocaleString()} -{' '}
-                      {metrics.maxPotentialLeads.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <Eye className={`w-4 h-4 ${colors.icon}`} />
-                      <p className="text-sm text-gray-600">
-                        Monthly Total Ad Views
-                      </p>
-                    </div>
-                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
-                      {metrics.totalImpressions.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <Users className={`w-4 h-4 ${colors.icon}`} />
-                      <p className="text-sm text-gray-600">
-                        Est Muslim Audience Reach
-                      </p>
-                    </div>
-                    <p className={`text-2xl sm:text-3xl font-bold break-words ${colors.text}`}>
-                      {metrics.minReach.toLocaleString()} -{' '}
-                      {metrics.maxReach.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* MasjidConnect placements — appended under whichever metric
-                  branch rendered, whenever the add-on is enabled. */}
-              {formData.has_masjidconnect && (
-                <div className="mt-4 pt-4 border-t border-indigo-100 text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Monitor className="w-4 h-4 text-indigo-600" />
-                    <p className="text-sm text-gray-600">
-                      Masjid Screen Placements
-                    </p>
-                  </div>
-                  <p className="text-2xl font-bold text-indigo-600">
-                    {masjidCountFor(formData.monthly_budget)} Masjid
-                    {masjidCountFor(formData.monthly_budget) > 1 ? 's' : ''}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    50 min daily screen time per masjid
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
 
       {/* Campaign Dates */}
       <div className="space-y-6 pb-8 border-b-2 border-gray-200">
