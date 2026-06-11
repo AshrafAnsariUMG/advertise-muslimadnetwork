@@ -5,11 +5,11 @@ import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import StepProgress from '@/components/signup/StepProgress';
-import BusinessInfoStep from '@/components/signup/BusinessInfoStep';
-import CampaignSetupStep from '@/components/signup/CampaignSetupStep';
-import ReviewStep from '@/components/signup/ReviewStep';
-import SaveLinkBar from '@/components/signup/SaveLinkBar';
+import StepProgress from '@/components/ssco-test/StepProgress';
+import BusinessInfoStep from '@/components/ssco-test/BusinessInfoStep';
+import CampaignSetupStep from '@/components/ssco-test/CampaignSetupStep';
+import ReviewStep from '@/components/ssco-test/ReviewStep';
+import SaveLinkBar from '@/components/ssco-test/SaveLinkBar';
 import HowItWorks from '@/components/signup/HowItWorks';
 import PublicShell from '@/components/layout/PublicShell';
 import BrandLogos from '@/components/layout/BrandLogos';
@@ -50,10 +50,14 @@ const INITIAL_FORM = {
 };
 
 /**
- * The production 3-step self-service wizard, rendered at `/`.
- * The /ssco-test sandbox uses a separate clone under components/ssco-test/.
+ * CLONE of the production wizard, powering the /ssco-test sandbox. It uses its
+ * own step components under components/ssco-test/, so changes here (including
+ * the payment calculation) never touch the live wizard at `/`. testMode
+ * defaults TRUE: MasjidConnect shows, drafts are flagged is_test (hidden from
+ * live admin/CRM), and checkout is a dry-run (no real charge — see the cloned
+ * ReviewStep). Promote a tested change by porting it into components/signup/*.
  */
-export default function WizardApp() {
+export default function WizardApp({ testMode = true }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [advertiserId, setAdvertiserId] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
@@ -177,6 +181,7 @@ export default function WizardApp() {
         const payload = {
           ...merged,
           status: STATUS_BY_STEP[currentStep] ?? 'incomplete_step_1',
+          is_test: true, // sandbox draft — isolated from live admin/CRM
         };
 
         try {
@@ -295,6 +300,7 @@ export default function WizardApp() {
       const payload = {
         ...formData,
         status: STATUS_BY_STEP[stepNumber] ?? 'incomplete_step_1',
+        is_test: true, // sandbox draft — isolated from live admin/CRM
       };
 
       if (advertiserId && accessToken) {
@@ -340,6 +346,7 @@ export default function WizardApp() {
           <CampaignSetupStep
             formData={formData}
             updateFormData={updateFormData}
+            testMode={testMode}
           />
         );
       case 2:
@@ -376,6 +383,13 @@ export default function WizardApp() {
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl" />
       </div>
 
+      {testMode && (
+        <div className="bg-amber-500 text-black text-center text-sm font-semibold py-2 px-4">
+          ⚠️ SSCO TEST ENVIRONMENT — sandbox for previewing in-development
+          features. Not the live site. Payments use LIVE keys, so don't
+          complete real checkouts here.
+        </div>
+      )}
       <div className="relative max-w-7xl mx-auto px-4 py-6 md:py-12">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-4 mb-6">
@@ -456,6 +470,7 @@ export default function WizardApp() {
                   advertiserId={advertiserId}
                   accessToken={accessToken}
                   hasEmail={!!formData.contact_email}
+                  testMode={testMode}
                 />
               )}
 

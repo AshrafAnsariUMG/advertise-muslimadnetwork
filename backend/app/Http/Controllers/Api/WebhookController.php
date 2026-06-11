@@ -176,6 +176,13 @@ class WebhookController extends Controller
      */
     public static function fireSubmissionFulfillment(Advertiser $advertiser): void
     {
+        // Belt-and-suspenders: /ssco-test sandbox records use dry-run checkout
+        // and never reach paid, but never fulfill (email/Mattermost/Pipedrive)
+        // a test record even if one somehow lands here.
+        if ($advertiser->is_test) {
+            return;
+        }
+
         try {
             if ($advertiser->contact_email) {
                 Mail::to($advertiser->contact_email)

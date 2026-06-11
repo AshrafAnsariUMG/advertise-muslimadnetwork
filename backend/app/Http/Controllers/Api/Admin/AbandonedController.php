@@ -67,6 +67,7 @@ class AbandonedController extends Controller
         $cutoff = now()->subMinutes(max(0, $minAgeMinutes));
 
         $query = Advertiser::query()
+            ->where('is_test', false) // exclude /ssco-test sandbox drafts
             ->whereIn('status', $stages)
             ->where('updated_at', '<', $cutoff);
 
@@ -371,6 +372,7 @@ class AbandonedController extends Controller
     private function summary(array $stages, \Carbon\Carbon $cutoff, bool $hasEmail, ?string $search): array
     {
         $base = Advertiser::query()
+            ->where('is_test', false) // exclude /ssco-test sandbox drafts
             ->whereIn('status', $stages)
             ->where('updated_at', '<', $cutoff);
 

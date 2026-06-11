@@ -134,6 +134,18 @@ export function verifyStripeCheckout(advertiserId, accessToken, sessionId) {
 }
 
 /**
+ * DRY-RUN checkout (used by the /ssco-test sandbox). Returns the computed
+ * total/breakdown — no Stripe/PayPal session, no charge.
+ * `{ dry_run, total, monthly_budget, design_fee, currency }`.
+ */
+export function previewCheckout(advertiserId, accessToken) {
+  return request('/api/v1/checkout/preview', {
+    method: 'POST',
+    body: { advertiser_id: advertiserId, access_token: accessToken },
+  });
+}
+
+/**
  * Creates a PayPal Order. Returns `{ order_id, approval_url }`. Send the
  * user to `approval_url` to approve the payment on PayPal's domain. PayPal
  * then redirects back to /payment/paypal-success which calls

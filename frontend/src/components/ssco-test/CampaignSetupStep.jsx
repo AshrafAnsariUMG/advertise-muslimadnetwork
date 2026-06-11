@@ -25,12 +25,13 @@ import {
   Users,
   Sparkles,
   Tv,
+  Monitor,
   CheckCircle2,
 } from 'lucide-react';
 
 // Leaflet relies on `window`/`document`, so the picker is loaded only on the
 // client — never during SSR/prerender.
-const LocationPicker = dynamic(() => import('./LocationPicker'), {
+const LocationPicker = dynamic(() => import('@/components/signup/LocationPicker'), {
   ssr: false,
   loading: () => (
     <div className="h-96 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-sm text-gray-500">
@@ -104,8 +105,16 @@ const CTR = 0.00167;
 const MIN_REACH_PERCENTAGE = 0.067;
 const MAX_REACH_PERCENTAGE = 0.1;
 
-// The CTV add-on requires a $1,500 minimum budget.
+// Premium add-ons (CTV + MasjidConnect) require a $1,500 minimum budget.
 const ADDON_MIN_BUDGET = 1500;
+
+// MasjidConnect (DOOH) masjid placements: base 2 masjids at $1,500, doubling
+// for each additional $2,500 spent above that. Matches the base44 export.
+function masjidCountFor(budget) {
+  const b = Number(budget) || 0;
+  const increments = Math.floor(Math.max(0, b - ADDON_MIN_BUDGET) / 2500);
+  return 2 * Math.pow(2, increments);
+}
 
 function getColorScheme(budget) {
   if (budget < 500) {
@@ -134,7 +143,11 @@ function getColorScheme(budget) {
   };
 }
 
-export default function CampaignSetupStep({ formData, updateFormData }) {
+export default function CampaignSetupStep({
+  formData,
+  updateFormData,
+  testMode = false,
+}) {
   // Defaults — only applied on first mount when the field is empty.
   useEffect(() => {
     const updates = {};
@@ -184,17 +197,22 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
     updateFormData({ target_countries: updated });
   };
 
-  // At ≥$1,500 the CTV add-on lights up (only for brand_awareness, the one
-  // objective whose CTV toggle is visible); below that it switches off.
+  // Omnichannel budget logic (base44 parity): at ≥$1,500 the premium add-ons
+  // light up; below that they switch off. CTV is only offered for
+  // brand_awareness (that's the only objective whose CTV toggle is visible),
+  // so we only auto-enable has_ctv there. MasjidConnect is gated behind
+  // testMode — it's not live to the public yet (only on /ssco-test).
   const applyBudgetSideEffects = (budget) => {
     const updates = { monthly_budget: budget };
     const ctvEligible =
       !formData.campaign_objective ||
       formData.campaign_objective === 'brand_awareness';
-    if (budget >= ADDON_MIN_BUDGET && ctvEligible) {
-      updates.has_ctv = true;
-    } else if (budget < ADDON_MIN_BUDGET) {
+    if (budget >= ADDON_MIN_BUDGET) {
+      if (testMode) updates.has_masjidconnect = true;
+      if (ctvEligible) updates.has_ctv = true;
+    } else {
       updates.has_ctv = false;
+      if (testMode) updates.has_masjidconnect = false;
     }
     return updates;
   };
@@ -457,9 +475,11 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
           ))}
         </div>
 
-        {formData.has_ctv && (
+        {(formData.has_ctv || formData.has_masjidconnect) && (
           <p className="text-xs text-purple-600 text-center -mt-2 mb-1">
-            Minimum $1,500/month required for Streaming TV Ads
+            {testMode
+              ? 'Minimum $1,500/month required for premium add-ons (CTV / MasjidConnect)'
+              : 'Minimum $1,500/month required for Streaming TV Ads'}
           </p>
         )}
 
@@ -668,6 +688,25 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
                 </div>
               )}
 
+              {/* MasjidConnect placements — appended under whichever metric
+                  branch rendered, whenever the add-on is enabled. */}
+              {testMode && formData.has_masjidconnect && (
+                <div className="mt-4 pt-4 border-t border-indigo-100 text-center">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <Monitor className="w-4 h-4 text-indigo-600" />
+                    <p className="text-sm text-gray-600">
+                      Masjid Screen Placements
+                    </p>
+                  </div>
+                  <p className="text-2xl font-bold text-indigo-600">
+                    {masjidCountFor(formData.monthly_budget)} Masjid
+                    {masjidCountFor(formData.monthly_budget) > 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    50 min daily screen time per masjid
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -783,6 +822,93 @@ export default function CampaignSetupStep({ formData, updateFormData }) {
               </div>
             </div>
           </div>
+        )}
+
+        {/* MasjidConnect (DOOH) add-on — gated behind testMode (not public yet;
+            visible only on /ssco-test). Shown for all objectives. */}
+        {testMode && (
+        <div
+          className={`mt-4 rounded-xl border-2 transition-all ${
+            formData.has_masjidconnect
+              ? 'border-indigo-300 bg-white'
+              : 'border-indigo-200 bg-indigo-50/50'
+          }`}
+        >
+          <div className="p-6">
+            <div className="flex flex-col md:flex-row items-stretch md:items-start gap-4 md:gap-6">
+              <div className="flex items-start gap-4 flex-1">
+                <Checkbox
+                  id="has_masjidconnect"
+                  checked={!!formData.has_masjidconnect}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      updateFormData({
+                        has_masjidconnect: true,
+                        monthly_budget: Math.max(
+                          Number(formData.monthly_budget) || 0,
+                          ADDON_MIN_BUDGET
+                        ),
+                      });
+                    } else {
+                      updateFormData({ has_masjidconnect: false });
+                    }
+                  }}
+                  className="mt-1"
+                />
+                <div className="flex-1">
+                  <label
+                    htmlFor="has_masjidconnect"
+                    className="flex items-center gap-2 cursor-pointer mb-2"
+                  >
+                    <div className="w-6 h-6 rounded bg-indigo-100 flex items-center justify-center">
+                      <Monitor className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    <span className="font-bold text-gray-900">
+                      Add Masjid Digital Screens (MasjidConnect)
+                    </span>
+                    <Badge className="bg-indigo-100 text-indigo-700 border-0 ml-2">
+                      Premium
+                    </Badge>
+                  </label>
+                  <p className="text-sm font-semibold text-indigo-600 mb-2">
+                    Bring your brand into the heart of the community.
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Reach local audiences on high-visibility digital screens
+                    inside trusted neighborhood masjids during peak community
+                    hours.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-indigo-50 rounded-lg p-4 text-center w-full md:w-auto md:min-w-fit">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <Monitor className="w-5 h-5 text-indigo-600" />
+                  <span className="text-2xl font-bold text-indigo-600">
+                    {masjidCountFor(formData.monthly_budget)} Masjid
+                    {masjidCountFor(formData.monthly_budget) > 1 ? 's' : ''}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-indigo-700">
+                  50 min daily screen time
+                </p>
+                <p className="text-xs text-gray-500 mt-1">per masjid</p>
+                {(Number(formData.monthly_budget) || 0) >= 2500 && (
+                  <p className="text-xs text-purple-600 font-semibold mt-2">
+                    ⭐ Unlocked at $2,500
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center gap-2 text-xs text-gray-600">
+              <div className="w-4 h-4 rounded-full border-2 border-indigo-500 flex items-center justify-center flex-shrink-0">
+                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              </div>
+              <span>Requires minimum budget of $1,500</span>
+            </div>
+          </div>
+        </div>
         )}
 
       {/* Campaign Dates */}

@@ -35,7 +35,8 @@ class AdvertiserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Advertiser::query();
+        // Exclude /ssco-test sandbox submissions from the live admin queue.
+        $query = Advertiser::query()->where('is_test', false);
 
         // Status filter — accepts comma-separated list
         if ($request->filled('status')) {
@@ -269,7 +270,7 @@ class AdvertiserController extends Controller
      */
     public function export(Request $request): StreamedResponse
     {
-        $query = Advertiser::query();
+        $query = Advertiser::query()->where('is_test', false); // exclude sandbox
 
         if ($request->filled('status')) {
             $statuses = array_filter(array_map('trim', explode(',', (string) $request->query('status'))));

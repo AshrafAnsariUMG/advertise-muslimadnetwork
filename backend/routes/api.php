@@ -36,6 +36,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('throttle:checkout')->group(function () {
         Route::post('/checkout/stripe', [CheckoutController::class, 'stripe']);
         Route::post('/checkout/stripe/verify', [CheckoutController::class, 'verify']);
+        Route::post('/checkout/preview', [CheckoutController::class, 'preview']); // /ssco-test dry-run
         Route::post('/checkout/paypal', [CheckoutController::class, 'paypal']);
         Route::post('/checkout/paypal/capture', [CheckoutController::class, 'paypalCapture']);
     });

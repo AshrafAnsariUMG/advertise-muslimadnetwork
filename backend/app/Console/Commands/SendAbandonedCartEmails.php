@@ -30,6 +30,7 @@ class SendAbandonedCartEmails extends Command
     public function handle(): int
     {
         $candidates = Advertiser::query()
+            ->where('is_test', false) // never email /ssco-test sandbox drafts
             ->where('status', AdvertiserStatus::IncompleteStep3->value)
             ->where('recovery_email_sent', false)
             ->where('created_at', '<', now()->subHours(24))

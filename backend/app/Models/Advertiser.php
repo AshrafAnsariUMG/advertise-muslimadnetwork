@@ -44,6 +44,7 @@ class Advertiser extends Model
         'design_service'           => 'boolean',
         'has_ctv'                  => 'boolean',
         'has_masjidconnect'        => 'boolean',
+        'is_test'                  => 'boolean',
         'recovery_email_sent'      => 'boolean',
         'pushed_to_pipedrive'      => 'boolean',
         'monthly_budget'           => 'decimal:2',
@@ -70,6 +71,25 @@ class Advertiser extends Model
     {
         $budget = (float) ($this->monthly_budget ?? 0);
         $design = $this->design_service ? 200.0 : 0.0;
+
+        return round($budget + $design, 2);
+    }
+
+    /**
+     * ISOLATED test pricing for the /ssco-test sandbox (is_test records).
+     *
+     * This is the safe place to develop new charge logic — e.g. MasjidConnect
+     * pricing — WITHOUT touching the live calculateTotal() above. Starts
+     * identical to production; diverge here, test on /ssco-test, then promote
+     * the change into calculateTotal() when ready.
+     */
+    public function calculateTotalTest(): float
+    {
+        $budget = (float) ($this->monthly_budget ?? 0);
+        $design = $this->design_service ? 200.0 : 0.0;
+
+        // TODO (sandbox): add MasjidConnect pricing here when the model is set.
+        // e.g. $masjid = $this->has_masjidconnect ? <cost> : 0.0;
 
         return round($budget + $design, 2);
     }

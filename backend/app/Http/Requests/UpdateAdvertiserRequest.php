@@ -59,6 +59,7 @@ class UpdateAdvertiserRequest extends FormRequest
             'design_service'           => ['nullable', 'boolean'],
             'has_ctv'                  => ['nullable', 'boolean'],
             'has_masjidconnect'        => ['nullable', 'boolean'],
+            'is_test'                  => ['nullable', 'boolean'],
 
             'payment_method'           => ['nullable', Rule::enum(PaymentMethod::class)],
             'payment_status'           => ['nullable', Rule::enum(PaymentStatus::class)],

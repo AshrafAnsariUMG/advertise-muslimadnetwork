@@ -128,6 +128,47 @@ class CheckoutController extends Controller
      * Body: { advertiser_id, access_token, session_id }
      * → { status: 'paid' | 'pending' }
      */
+    /**
+     * POST /api/v1/checkout/preview — DRY RUN (no payment).
+     *
+     * Used by the /ssco-test sandbox: computes what the campaign WOULD cost
+     * (via the isolated test pricing for is_test records) and returns the
+     * breakdown WITHOUT creating any Stripe/PayPal session — no real money
+     * moves. Lets us verify new pricing logic (e.g. MasjidConnect) safely.
+     *
+     * Body: { advertiser_id, access_token }
+     * → { dry_run: true, total, monthly_budget, design_fee, currency }
+     */
+    public function preview(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'advertiser_id' => ['required', 'uuid'],
+            'access_token'  => ['required', 'string', 'size:64'],
+        ]);
+
+        $advertiser = Advertiser::find($validated['advertiser_id']);
+        if (!$advertiser) {
+            return response()->json(['message' => 'Advertiser not found.'], Response::HTTP_NOT_FOUND);
+        }
+        if (!hash_equals($advertiser->access_token, $validated['access_token'])) {
+            return response()->json(['message' => 'Invalid access token.'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Test records use the isolated pricing path; live records (should not
+        // hit this endpoint, but guard anyway) use the canonical total.
+        $total = $advertiser->is_test
+            ? $advertiser->calculateTotalTest()
+            : $advertiser->calculateTotal();
+
+        return response()->json([
+            'dry_run'        => true,
+            'total'          => round($total, 2),
+            'monthly_budget' => (float) ($advertiser->monthly_budget ?? 0),
+            'design_fee'     => $advertiser->design_service ? 200.0 : 0.0,
+            'currency'       => strtoupper((string) config('stripe.currency', 'usd')),
+        ]);
+    }
+
     public function verify(Request $request): JsonResponse
     {
         $validated = $request->validate([

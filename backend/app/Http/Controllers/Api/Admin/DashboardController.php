@@ -42,6 +42,7 @@ class DashboardController extends Controller
     private function totals(): array
     {
         $row = Advertiser::query()
+            ->where('is_test', false) // exclude /ssco-test sandbox
             ->selectRaw('
                 COUNT(*) AS all_count,
                 SUM(CASE WHEN payment_status = ? THEN 1 ELSE 0 END) AS paid_count,
@@ -75,6 +76,7 @@ class DashboardController extends Controller
         $cutoff = now()->subHours(24);
 
         $row = Advertiser::query()
+            ->where('is_test', false) // exclude /ssco-test sandbox
             ->where('status', AdvertiserStatus::IncompleteStep3->value)
             ->where('created_at', '<', $cutoff)
             ->selectRaw('
@@ -95,6 +97,7 @@ class DashboardController extends Controller
     private function statusBreakdown(): array
     {
         return Advertiser::query()
+            ->where('is_test', false) // exclude /ssco-test sandbox
             ->selectRaw('status, COUNT(*) AS count')
             ->groupBy('status')
             ->orderBy('status')
@@ -120,6 +123,7 @@ class DashboardController extends Controller
         $end = Carbon::today()->endOfDay();
 
         $rows = Advertiser::query()
+            ->where('is_test', false) // exclude /ssco-test sandbox
             ->where('created_at', '>=', $start)
             ->where('created_at', '<=', $end)
             ->selectRaw('DATE(created_at) AS day, COUNT(*) AS count')
