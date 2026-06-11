@@ -117,6 +117,8 @@ export default function AdvertiserSignupPage() {
               ad_creatives: saved.ad_creatives || [],
               ad_destination_url: saved.ad_destination_url || '',
               design_service: saved.design_service || false,
+              has_ctv: saved.has_ctv || false,
+              has_masjidconnect: saved.has_masjidconnect || false,
               notes: saved.notes || '',
             });
             setCurrentStep(STEP_BY_STATUS[saved.status] ?? 0);

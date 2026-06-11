@@ -200,8 +200,15 @@ class CheckoutController extends Controller
         $endDate = optional($advertiser->campaign_end_date)->format('M j, Y') ?? 'TBD';
 
         $campaignDescription = "{$objectiveLabel} · {$startDate} to {$endDate}";
+        $addons = [];
         if ($advertiser->has_ctv) {
-            $campaignDescription .= ' (CTV inventory included)';
+            $addons[] = 'CTV';
+        }
+        if ($advertiser->has_masjidconnect) {
+            $addons[] = 'MasjidConnect';
+        }
+        if ($addons) {
+            $campaignDescription .= ' (' . implode(' + ', $addons) . ' included)';
         }
 
         $lineItems = [[

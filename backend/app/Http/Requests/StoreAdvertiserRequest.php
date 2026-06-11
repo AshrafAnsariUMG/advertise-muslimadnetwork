@@ -58,6 +58,7 @@ class StoreAdvertiserRequest extends FormRequest
             'ad_destination_url'       => ['nullable', 'url', 'max:500'],
             'design_service'           => ['nullable', 'boolean'],
             'has_ctv'                  => ['nullable', 'boolean'],
+            'has_masjidconnect'        => ['nullable', 'boolean'],
 
             // Payment (controlled by webhooks normally, but allowed for completeness)
             'payment_method'           => ['nullable', Rule::enum(PaymentMethod::class)],

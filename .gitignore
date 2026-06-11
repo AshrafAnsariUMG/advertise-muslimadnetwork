@@ -1,5 +1,7 @@
 # Reference source (not committed)
 _base44-reference/
+latestBase44Export.zip
+latestBase44Export/
 
 # Local-only scratch / screenshots used during agent sessions
 tempImages/
@@ -55,4 +57,5 @@ Thumbs.db
 # session memory, settings, and tool transcripts. Neither belongs in a
 # shared remote.
 CLAUDE.md
+CONTEXT.md
 .claude/

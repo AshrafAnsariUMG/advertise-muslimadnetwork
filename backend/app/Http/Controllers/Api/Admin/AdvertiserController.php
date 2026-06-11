@@ -304,7 +304,7 @@ class AdvertiserController extends Controller
         $columns = [
             'id', 'business_name', 'business_type', 'contact_name', 'contact_email',
             'contact_phone', 'website_url', 'campaign_name', 'campaign_objective',
-            'monthly_budget', 'design_service', 'has_ctv', 'total', 'status',
+            'monthly_budget', 'design_service', 'has_ctv', 'has_masjidconnect', 'total', 'status',
             'payment_status', 'payment_method', 'campaign_start_date',
             'campaign_end_date', 'created_at',
         ];
@@ -331,6 +331,7 @@ class AdvertiserController extends Controller
                         $a->monthly_budget,
                         $a->design_service ? 'yes' : 'no',
                         $a->has_ctv ? 'yes' : 'no',
+                        $a->has_masjidconnect ? 'yes' : 'no',
                         round($a->calculateTotal(), 2),
                         $a->status?->value,
                         $a->payment_status?->value,
@@ -470,6 +471,7 @@ class AdvertiserController extends Controller
             'monthly_budget'      => $a->monthly_budget,
             'design_service'      => (bool) $a->design_service,
             'has_ctv'             => (bool) $a->has_ctv,
+            'has_masjidconnect'   => (bool) $a->has_masjidconnect,
             'status'              => $a->status?->value,
             'payment_status'      => $a->payment_status?->value,
             'payment_method'      => $a->payment_method?->value,

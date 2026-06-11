@@ -342,6 +342,9 @@ class PipedriveService
     {
         $designService = $a->design_service ? 'Yes ($200)' : 'No';
         $total = $a->calculateTotal();
+        $addons = [];
+        if ($a->has_ctv) $addons[] = 'Streaming TV (CTV)';
+        if ($a->has_masjidconnect) $addons[] = 'Masjid Screens (DOOH)';
         return $this->renderNote([
             'Name'                => $a->contact_name,
             'Email'               => $a->contact_email,
@@ -350,6 +353,7 @@ class PipedriveService
             'Website URL'         => $a->website_url,
             'Campaign Name'       => $a->campaign_name,
             'Monthly Budget'      => $this->money($a->monthly_budget),
+            'Channel Add-ons'     => $addons ? implode(', ', $addons) : 'Display only',
             'Design Service'      => $designService,
             'Total Value'         => $this->money($total),
             'Application Status'  => $this->humanize($a->status?->value),

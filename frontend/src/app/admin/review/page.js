@@ -808,6 +808,10 @@ export default function AdminReviewPage() {
                 )}
                 <Field label="Has CTV" value={detail.has_ctv ? 'Yes' : 'No'} />
                 <Field
+                  label="MasjidConnect"
+                  value={detail.has_masjidconnect ? 'Yes' : 'No'}
+                />
+                <Field
                   label="Design service"
                   value={detail.design_service ? 'Yes (+$200)' : 'No'}
                 />

@@ -139,9 +139,11 @@ class UploadController extends Controller
      */
     private function handleVideo(Advertiser $advertiser, $upload)
     {
-        if (!$advertiser->has_ctv) {
+        // CTV (streaming TV) and MasjidConnect (in-mosque digital screens) both
+        // run video creatives; display-only campaigns take banners.
+        if (!$advertiser->has_ctv && !$advertiser->has_masjidconnect) {
             return response()->json([
-                'message' => 'Video creatives are only accepted for campaigns with the Streaming TV (CTV) add-on. Upload a display banner (JPEG/PNG) instead.',
+                'message' => 'Video creatives are only accepted for campaigns with the Streaming TV (CTV) or Masjid Screens (DOOH) add-on. Upload a display banner (JPEG/PNG) instead.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 

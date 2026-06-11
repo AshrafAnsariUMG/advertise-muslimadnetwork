@@ -99,7 +99,7 @@ function SuccessInner() {
           <PostPaymentCreatives
             advertiserId={id}
             accessToken={token}
-            hasCtv={!!advertiser?.has_ctv}
+            hasCtv={!!advertiser?.has_ctv || !!advertiser?.has_masjidconnect}
             initialCreatives={advertiser?.ad_creatives || []}
             onDone={handleDone}
           />

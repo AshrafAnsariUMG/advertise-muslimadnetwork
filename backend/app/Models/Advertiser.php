@@ -43,6 +43,7 @@ class Advertiser extends Model
         'ad_creatives'             => 'array',
         'design_service'           => 'boolean',
         'has_ctv'                  => 'boolean',
+        'has_masjidconnect'        => 'boolean',
         'recovery_email_sent'      => 'boolean',
         'pushed_to_pipedrive'      => 'boolean',
         'monthly_budget'           => 'decimal:2',
