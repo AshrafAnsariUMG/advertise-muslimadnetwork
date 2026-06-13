@@ -105,8 +105,20 @@ const CTR = 0.00167;
 const MIN_REACH_PERCENTAGE = 0.067;
 const MAX_REACH_PERCENTAGE = 0.1;
 
-// Premium add-ons (CTV + MasjidConnect) require a $1,500 minimum budget.
-const ADDON_MIN_BUDGET = 1500;
+// Add-on ⇄ budget tiers: ONE premium add-on (CTV or MasjidConnect) needs
+// $1,500; BOTH together need $2,500. These link the slider/tiles to the
+// add-on checkboxes bidirectionally (see applyBudgetSideEffects + the toggles).
+const ADDON_MIN_BUDGET = 1500;   // one add-on
+const BOTH_ADDON_BUDGET = 2500;  // both add-ons (omnichannel)
+
+// Budget required for a given add-on combination (null = no add-ons, so don't
+// force the budget).
+function budgetForAddons(ctv, mc) {
+  const count = (ctv ? 1 : 0) + (mc ? 1 : 0);
+  if (count >= 2) return BOTH_ADDON_BUDGET;
+  if (count === 1) return ADDON_MIN_BUDGET;
+  return null;
+}
 
 // MasjidConnect (DOOH) masjid placements: base 2 masjids at $1,500, doubling
 // for each additional $2,500 spent above that. Matches the base44 export.
@@ -202,17 +214,29 @@ export default function CampaignSetupStep({
   // brand_awareness (that's the only objective whose CTV toggle is visible),
   // so we only auto-enable has_ctv there. MasjidConnect is gated behind
   // testMode — it's not live to the public yet (only on /ssco-test).
+  // Slider / preset tile drives the add-ons (the reverse of the checkbox
+  // handlers below):
+  //   • ≥ $2,500  → BOTH CTV + MasjidConnect on            (Rule A)
+  //   • $1,500–$2,499 → single-channel tier: at most one add-on
+  //                     (if both were on, drop MasjidConnect, keep CTV)
+  //   • < $1,500  → no add-ons
   const applyBudgetSideEffects = (budget) => {
     const updates = { monthly_budget: budget };
     const ctvEligible =
       !formData.campaign_objective ||
       formData.campaign_objective === 'brand_awareness';
-    if (budget >= ADDON_MIN_BUDGET) {
-      if (testMode) updates.has_masjidconnect = true;
+
+    if (budget >= BOTH_ADDON_BUDGET) {
+      updates.has_masjidconnect = true;
       if (ctvEligible) updates.has_ctv = true;
+    } else if (budget >= ADDON_MIN_BUDGET) {
+      // Only room for one add-on at this tier.
+      if (formData.has_ctv && formData.has_masjidconnect) {
+        updates.has_masjidconnect = false;
+      }
     } else {
       updates.has_ctv = false;
-      if (testMode) updates.has_masjidconnect = false;
+      updates.has_masjidconnect = false;
     }
     return updates;
   };
@@ -729,14 +753,13 @@ export default function CampaignSetupStep({
                     id="has_ctv"
                     checked={!!formData.has_ctv}
                     onCheckedChange={(checked) => {
-                      if (checked) {
-                        updateFormData({
-                          has_ctv: true,
-                          monthly_budget: 1500,
-                        });
-                      } else {
-                        updateFormData({ has_ctv: false });
-                      }
+                      // Selecting an add-on drives the slider: one add-on →
+                      // $1,500 (Rule B), both → $2,500 (Rule D). Deselecting
+                      // down to one keeps $1,500; down to none leaves budget.
+                      const updates = { has_ctv: checked };
+                      const b = budgetForAddons(checked, formData.has_masjidconnect);
+                      if (b !== null) updates.monthly_budget = b;
+                      updateFormData(updates);
                     }}
                     className="mt-1"
                   />
@@ -841,17 +864,13 @@ export default function CampaignSetupStep({
                   id="has_masjidconnect"
                   checked={!!formData.has_masjidconnect}
                   onCheckedChange={(checked) => {
-                    if (checked) {
-                      updateFormData({
-                        has_masjidconnect: true,
-                        monthly_budget: Math.max(
-                          Number(formData.monthly_budget) || 0,
-                          ADDON_MIN_BUDGET
-                        ),
-                      });
-                    } else {
-                      updateFormData({ has_masjidconnect: false });
-                    }
+                    // Selecting an add-on drives the slider: one add-on →
+                    // $1,500 (Rule C), both → $2,500 (Rule D). Deselecting
+                    // down to one keeps $1,500; down to none leaves budget.
+                    const updates = { has_masjidconnect: checked };
+                    const b = budgetForAddons(formData.has_ctv, checked);
+                    if (b !== null) updates.monthly_budget = b;
+                    updateFormData(updates);
                   }}
                   className="mt-1"
                 />
